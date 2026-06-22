@@ -5,51 +5,106 @@
     <p class="subtitle">보드게임 이야기를 가볍게 남겨보세요.</p>
 </section>
 
-<section class="card community-compose">
-    <form action="{% url 'community:create' %}" method="POST" class="compose-form">
-        {% csrf_token %}
-        <input type="text" name="content" class="input-field" placeholder="오늘 게임 어땠나요?" required>
-        <button type="submit" class="btn btn-yellow compose-submit">
-            <i class="fa-regular fa-paper-plane"></i> 등록
+<!-- Actions Bar (Search + Compose Button) -->
+<section class="community-actions-bar">
+    <div class="actions-left-search">
+        <form action="{% url 'community:index' %}" method="GET" class="search-form">
+            <div class="search-wrapper">
+                <input type="text" name="q" value="{{ query }}" placeholder="글 내용 또는 작성자 검색..." class="input-field search-input">
+                <button type="submit" class="btn btn-brown search-submit">
+                    <i class="fa-solid fa-magnifying-glass"></i> 검색
+                </button>
+                {% if query %}
+                <a href="{% url 'community:index' %}" class="btn btn-outline search-clear">
+                    초기화
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <div class="actions-right-compose">
+        {% if user.is_authenticated %}
+        <button class="btn btn-yellow open-compose-btn" onclick="openComposeModal()">
+            <i class="fa-solid fa-pencil"></i> 낙서하기
         </button>
-    </form>
+        {% else %}
+        <a href="{% url 'accounts:login' %}" class="btn btn-yellow open-compose-btn" style="text-decoration: none;">
+            <i class="fa-solid fa-pencil"></i> 로그인 후 낙서하기
+        </a>
+        {% endif %}
+    </div>
 </section>
 
 <section class="note-grid">
     {% for article in articles %}
     <article class="card note-card note-color-{% cycle 'red' 'yellow' 'blue' 'green' %}">
-        <div class="note-author">
-            <i class="fa-solid fa-user-astronaut"></i>
-            <a href="{% url 'accounts:profile' article.user.pk %}">{{ article.user.username }}</a>
-        </div>
+        <div class="note-header">
+            <div class="note-author">
+                <i class="fa-solid fa-user-astronaut"></i>
+                <a href="{% url 'accounts:profile' article.user.pk %}">{{ article.user.username }}</a>
+            </div>
 
-        {% if user == article.user %}
-        <div class="note-actions">
-            <a href="{% url 'community:update' article.pk %}" aria-label="수정"><i class="fa-solid fa-pen"></i></a>
-            <form action="{% url 'community:delete' article.pk %}" method="POST">
-                {% csrf_token %}
-                <button type="submit" aria-label="삭제"><i class="fa-solid fa-trash"></i></button>
-            </form>
+            {% if user == article.user %}
+            <div class="note-actions">
+                <a href="{% url 'community:update' article.pk %}" aria-label="수정"><i class="fa-solid fa-pen"></i></a>
+                <form action="{% url 'community:delete' article.pk %}" method="POST" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" aria-label="삭제"><i class="fa-solid fa-trash"></i></button>
+                </form>
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
 
         <p class="note-content">{{ article.content }}</p>
 
-        <div class="note-like">
-            {% if user.is_authenticated %}
-            <form class="like-forms" data-article-id="{{ article.pk }}">
-                {% csrf_token %}
-                <button type="submit">
-                    {% if user in article.like_users.all %}
-                        <i class="fa-solid fa-heart" id="like-icon-{{ article.pk }}"></i>
-                    {% else %}
-                        <i class="fa-regular fa-heart" id="like-icon-{{ article.pk }}"></i>
+        <div class="note-footer">
+            <div class="note-like">
+                {% if user.is_authenticated %}
+                <form class="like-forms" data-article-id="{{ article.pk }}">
+                    {% csrf_token %}
+                    <button type="submit">
+                        {% if user in article.like_users.all %}
+                            <i class="fa-solid fa-heart" id="like-icon-{{ article.pk }}"></i>
+                        {% else %}
+                            <i class="fa-regular fa-heart" id="like-icon-{{ article.pk }}"></i>
+                        {% endif %}
+                        <span id="like-count-{{ article.pk }}">{{ article.like_users.all|length }}</span>
+                    </button>
+                </form>
+                {% else %}
+                    <span><i class="fa-solid fa-heart"></i> {{ article.like_users.all|length }}</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Reply Section (Comments) -->
+        <div class="note-comments-section">
+            {% if article.comments.all %}
+            <div class="comments-list">
+                {% for comment in article.comments.all %}
+                <div class="comment-item">
+                    <div class="comment-bubble">
+                        <span class="comment-author"><a href="{% url 'accounts:profile' comment.user.pk %}">{{ comment.user.username }}</a></span>
+                        <span class="comment-content">{{ comment.content }}</span>
+                    </div>
+                    {% if user == comment.user %}
+                    <form action="{% url 'community:comment_delete' article.pk comment.pk %}" method="POST" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-comment-delete" aria-label="삭제"><i class="fa-solid fa-xmark"></i></button>
+                    </form>
                     {% endif %}
-                    <span id="like-count-{{ article.pk }}">{{ article.like_users.all|length }}</span>
-                </button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if user.is_authenticated %}
+            <form action="{% url 'community:comment_create' article.pk %}" method="POST" class="comment-form">
+                {% csrf_token %}
+                <input type="text" name="content" placeholder="답글을 남겨주세요." required class="comment-input">
+                <button type="submit" class="comment-submit-btn">등록</button>
             </form>
-            {% else %}
-                <span><i class="fa-solid fa-heart"></i> {{ article.like_users.all|length }}</span>
             {% endif %}
         </div>
     </article>
@@ -57,6 +112,26 @@
     <div class="card empty-note">아직 낙서가 없습니다.</div>
     {% endfor %}
 </section>
+
+<!-- Compose Modal Overlay -->
+<div class="modal-overlay" id="composeModal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px; text-align: left;">
+        <span class="modal-close" onclick="closeComposeModal()">&times;</span>
+        <h3 style="color: var(--primary-color); margin-top: 0; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-pencil" style="color: var(--accent-color);"></i> 새 낙서 남기기
+        </h3>
+        <form action="{% url 'community:create' %}" method="POST" class="modal-compose-form">
+            {% csrf_token %}
+            <textarea name="content" class="input-field" placeholder="오늘 게임 어땠나요? 재미있는 이야기를 자유롭게 남겨보세요! 🖍️" required style="width: 100%; min-height: 120px; resize: vertical; margin-bottom: 1.2rem; font-family: inherit; font-size: 1rem; padding: 0.8rem; border-radius: 12px; border: 2px solid var(--box-bg); box-sizing: border-box;"></textarea>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-outline" onclick="closeComposeModal()" style="margin: 0; width: auto; font-size: 0.95rem; padding: 0.6rem 1.2rem;">취소</button>
+                <button type="submit" class="btn btn-yellow" style="margin: 0; width: auto; font-size: 0.95rem; padding: 0.6rem 1.5rem;">
+                    <i class="fa-regular fa-paper-plane"></i> 등록
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <script>
     const likeForms = document.querySelectorAll('.like-forms')
@@ -95,5 +170,25 @@
             })
         })
     })
+
+    function openComposeModal() {
+        document.getElementById('composeModal').style.display = 'flex';
+        setTimeout(() => {
+            const textarea = document.querySelector('#composeModal textarea');
+            if (textarea) textarea.focus();
+        }, 100);
+    }
+
+    function closeComposeModal() {
+        document.getElementById('composeModal').style.display = 'none';
+    }
+
+    // Close modal when clicking outside content
+    window.addEventListener('click', function (event) {
+        const composeModal = document.getElementById('composeModal');
+        if (event.target === composeModal) {
+            closeComposeModal();
+        }
+    });
 </script>
 {% endblock %}

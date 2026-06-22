@@ -5,11 +5,11 @@
     <p class="subtitle">뭐라고 썼었더라 🖍️</p>
 </div>
 
-<div class="card" style="margin-bottom: 2rem; border-color: #f1ebd9; background:#f9f6f0;">
+<div class="card" style="margin-bottom: 2rem; border: 4px solid var(--box-bg); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.03); background:#fff; text-align: left;">
     <form action="{% url 'community:update' article.pk %}" method="POST" style="display:flex; gap:10px;">
         {% csrf_token %}
         <input type="text" name="content" class="input-field" style="margin-bottom:0;" value="{{ article.content }}" required>
-        <button type="submit" class="btn btn-yellow" style="width:120px; margin:0;"><i class="fa-regular fa-paper-plane"></i> 수정</button>
+        <button type="submit" class="btn btn-yellow" style="width:auto; min-width:120px; padding:0 1.5rem; margin:0;"><i class="fa-solid fa-pencil"></i> 수정</button>
     </form>
 </div>
 <div style="text-align:center;">
