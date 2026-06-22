@@ -4,15 +4,132 @@
     <div class="card auth-card">
         <div class="auth-icon"><i class="fa-solid fa-user-plus"></i></div>
         <h2>회원가입</h2>
-        <p class="auth-subtitle">보드게임 친구들과 함께 시작해요.</p>
+        <p class="auth-subtitle">아이디와 비밀번호를 정하고 시작해요.</p>
 
-        <form action="{% url 'accounts:signup' %}" method="POST" class="auth-form">
+        <form action="{% url 'accounts:signup' %}" method="POST" class="auth-form signup-form" id="signupForm" novalidate>
             {% csrf_token %}
-            {{ form.as_p }}
+
+            {% if form.non_field_errors %}
+                <div class="form-errors">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <div class="auth-field">
+                <label for="{{ form.username.id_for_label }}">아이디</label>
+                {{ form.username }}
+                {% if form.username.errors %}
+                    <div class="form-errors">{{ form.username.errors }}</div>
+                {% endif %}
+                <ul class="live-rules" id="usernameRules" aria-live="polite"></ul>
+            </div>
+
+            <div class="auth-field">
+                <label for="{{ form.password1.id_for_label }}">비밀번호</label>
+                {{ form.password1 }}
+                {% if form.password1.errors %}
+                    <div class="form-errors">{{ form.password1.errors }}</div>
+                {% endif %}
+                <ul class="live-rules" id="passwordRules" aria-live="polite"></ul>
+            </div>
+
+            <div class="auth-field">
+                <label for="{{ form.password2.id_for_label }}">비밀번호 확인</label>
+                {{ form.password2 }}
+                {% if form.password2.errors %}
+                    <div class="form-errors">{{ form.password2.errors }}</div>
+                {% endif %}
+                <ul class="live-rules" id="confirmRules" aria-live="polite"></ul>
+            </div>
+
             <button type="submit" class="btn btn-yellow auth-submit">가입하기</button>
         </form>
 
         <a class="auth-link" href="{% url 'accounts:login' %}">이미 계정이 있나요?</a>
     </div>
 </section>
+
+<script>
+    const signupForm = document.querySelector('#signupForm')
+    const usernameInput = document.querySelector('#id_username')
+    const passwordInput = document.querySelector('#id_password1')
+    const confirmInput = document.querySelector('#id_password2')
+    const usernameRules = document.querySelector('#usernameRules')
+    const passwordRules = document.querySelector('#passwordRules')
+    const confirmRules = document.querySelector('#confirmRules')
+    const commonPasswords = ['password', 'password123', 'qwerty123', '12345678', '11111111', '00000000']
+
+    function renderRules(target, messages) {
+        target.innerHTML = messages.map((message) => `<li>${message}</li>`).join('')
+        target.style.display = messages.length ? 'block' : 'none'
+    }
+
+    function usernameMessages(showEmpty = false) {
+        const username = usernameInput.value.trim()
+        const messages = []
+
+        if (!username) {
+            if (showEmpty) messages.push('아이디를 입력해주세요.')
+            return messages
+        }
+        if (username.length > 150) messages.push('아이디는 150자 이하로 입력해주세요.')
+        if (!/^[A-Za-z0-9@.+_-]+$/.test(username)) {
+            messages.push('아이디는 영문, 숫자, @, ., +, -, _ 만 사용할 수 있어요.')
+        }
+        return messages
+    }
+
+    function passwordMessages(showEmpty = false) {
+        const username = usernameInput.value.trim().toLowerCase()
+        const password = passwordInput.value
+        const messages = []
+
+        if (!password) {
+            if (showEmpty) messages.push('비밀번호를 입력해주세요.')
+            return messages
+        }
+        if (password.length < 8) messages.push('비밀번호는 8자 이상이어야 해요.')
+        if (/^\d+$/.test(password)) messages.push('숫자로만 이루어진 비밀번호는 사용할 수 없어요.')
+        if (username && password.toLowerCase().includes(username)) {
+            messages.push('아이디와 너무 비슷한 비밀번호는 피해주세요.')
+        }
+        if (commonPasswords.includes(password.toLowerCase())) {
+            messages.push('너무 흔한 비밀번호는 사용할 수 없어요.')
+        }
+        return messages
+    }
+
+    function confirmMessages(showEmpty = false) {
+        const password = passwordInput.value
+        const confirm = confirmInput.value
+        const messages = []
+
+        if (!confirm) {
+            if (showEmpty) messages.push('비밀번호 확인을 입력해주세요.')
+            return messages
+        }
+        if (password !== confirm) messages.push('비밀번호가 서로 일치하지 않아요.')
+        return messages
+    }
+
+    function validate(showEmpty = false) {
+        const usernameResult = usernameMessages(showEmpty)
+        const passwordResult = passwordMessages(showEmpty)
+        const confirmResult = confirmMessages(showEmpty)
+
+        renderRules(usernameRules, usernameResult)
+        renderRules(passwordRules, passwordResult)
+        renderRules(confirmRules, confirmResult)
+
+        return usernameResult.length + passwordResult.length + confirmResult.length === 0
+    }
+
+    ;[usernameInput, passwordInput, confirmInput].forEach((input) => {
+        input.addEventListener('input', () => validate(false))
+    })
+
+    signupForm.addEventListener('submit', (event) => {
+        if (!validate(true)) {
+            event.preventDefault()
+        }
+    })
+</script>
 {% endblock %}

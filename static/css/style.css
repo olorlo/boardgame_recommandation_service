@@ -209,6 +209,9 @@ h1 {
 .auth-form p {
   margin: 0 0 1rem;
 }
+.auth-field {
+  margin-bottom: 1rem;
+}
 .auth-form label {
   display: block;
   margin-bottom: 0.45rem;
@@ -245,6 +248,20 @@ h1 {
   background: #fff0ee;
   color: var(--accent-color);
   list-style-position: inside;
+}
+.form-errors .errorlist,
+.live-rules {
+  margin: 0.45rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--accent-color);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.live-rules {
+  display: none;
+}
+.signup-form .helptext {
+  display: none;
 }
 .auth-submit {
   max-width: none;
