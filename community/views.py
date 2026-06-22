@@ -2,14 +2,44 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.http import require_POST, require_http_methods
 from django.contrib.auth.decorators import login_required
-from .models import Article
+from django.db.models import Q
+from .models import Article, Comment
 
 def index(request):
+    query = request.GET.get('q', '').strip()
     articles = Article.objects.all().order_by('-created_at')
+    
+    if query:
+        articles = articles.filter(
+            Q(content__icontains=query) | Q(user__username__icontains=query)
+        )
+        
+    articles = articles.prefetch_related('comments__user', 'user', 'like_users')
+    
     context = {
         'articles': articles,
+        'query': query,
     }
     return render(request, 'community/index.html', context)
+
+@require_POST
+@login_required
+def comment_create(request, article_pk):
+    article = get_object_or_404(Article, pk=article_pk)
+    content = request.POST.get('content', '').strip()
+    if content:
+        comment = Comment(article=article, user=request.user, content=content)
+        comment.save()
+    return redirect('community:index')
+
+@require_POST
+@login_required
+def comment_delete(request, article_pk, comment_pk):
+    comment = get_object_or_404(Comment, pk=comment_pk, article_id=article_pk)
+    if request.user == comment.user:
+        comment.delete()
+    return redirect('community:index')
+
 
 @require_POST
 @login_required
