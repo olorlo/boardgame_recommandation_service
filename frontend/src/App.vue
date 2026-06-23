@@ -7,8 +7,11 @@
       <a href="#" :class="{ active: view === 'main' || view === 'recommend' }" @click.prevent="showRecommend">
         <i class="fa-solid fa-link"></i> 추천
       </a>
-      <button type="button" @click="openToolModal('penalty')">
-        <i class="fa-regular fa-square"></i> 벌칙/순서
+      <button type="button" :class="{ active: toolModal === 'penalty' }" @click="openToolModal('penalty')">
+        <i class="fa-solid fa-circle-exclamation"></i> 벌칙
+      </button>
+      <button type="button" :class="{ active: toolModal === 'turn' }" @click="openToolModal('turn')">
+        <i class="fa-solid fa-route"></i> 순서
       </button>
       <a href="/community/"><i class="fa-regular fa-comment"></i> 커뮤니티</a>
       <a href="/accounts/login/">로그인</a>
@@ -29,10 +32,10 @@
           <i class="fa-solid fa-dice-d20"></i> 게임 추천받기
         </button>
         <button class="btn btn-red" @click="openToolModal('penalty')">
-          <i class="fa-solid fa-skull"></i> 벌칙 뽑기
+          <i class="fa-solid fa-skull"></i> 벌칙 원판
         </button>
         <button class="btn btn-brown" @click="openToolModal('turn')">
-          <i class="fa-solid fa-users"></i> 순서 정하기
+          <i class="fa-solid fa-route"></i> 사다리 순서
         </button>
       </div>
     </section>
@@ -104,41 +107,154 @@
   </main>
 
   <div v-if="toolModal" class="modal-overlay" @click.self="closeToolModal">
-    <div class="modal-content">
+    <div class="modal-content tool-modal">
       <button class="modal-close" type="button" @click="closeToolModal">&times;</button>
       <div class="tool-tabs">
-        <button class="btn" :class="toolModal === 'penalty' ? 'btn-red' : 'btn-brown'" style="width: auto; padding: 0.5rem 1rem; font-size: 1rem;" @click="openToolModal('penalty')">
-          벌칙 뽑기
+        <button class="tool-tab" :class="{ active: toolModal === 'penalty' }" @click="openToolModal('penalty')">
+          <i class="fa-solid fa-circle-exclamation"></i> 벌칙
         </button>
-        <button class="btn" :class="toolModal === 'turn' ? 'btn-red' : 'btn-brown'" style="width: auto; padding: 0.5rem 1rem; font-size: 1rem;" @click="openToolModal('turn')">
-          순서 정하기
+        <button class="tool-tab" :class="{ active: toolModal === 'turn' }" @click="openToolModal('turn')">
+          <i class="fa-solid fa-route"></i> 순서
         </button>
       </div>
 
       <template v-if="toolModal === 'penalty'">
-        <h2 style="color: var(--primary-color);">오늘의 희생자는?</h2>
-        <p style="color: var(--text-light);">불만 없기 약속</p>
-        <div class="card tool-result">
-          <i class="fa-regular fa-hand" style="font-size: 3rem; color: var(--text-light); margin-bottom: 10px;"></i>
-          <p style="font-weight: bold; color: var(--text-light);">
-            <span v-if="penaltyResult" style="color: var(--accent-color); font-size: 1.5rem;">{{ penaltyResult }}</span>
-            <span v-else>아래 버튼을 눌러 뽑으세요</span>
-          </p>
+        <h2 class="tool-title">벌칙 원판</h2>
+        <p class="tool-subtitle">벌칙과 확률을 정한 뒤 원판을 돌려보세요.</p>
+
+        <div class="wheel-layout">
+          <div class="wheel-stage">
+            <div class="wheel-pointer"></div>
+            <svg
+              class="penalty-wheel"
+              viewBox="0 0 300 300"
+              role="img"
+              aria-label="벌칙 원판"
+            >
+              <g class="wheel-rotor" :style="{ transform: `rotate(${wheelRotation}deg)` }">
+                <g v-for="slice in wheelSlices" :key="slice.id">
+                  <path
+                    :d="slice.path"
+                    :fill="slice.color"
+                    class="wheel-slice"
+                  />
+                  <text
+                    :x="slice.labelX"
+                    :y="slice.labelY"
+                    :transform="`rotate(${slice.textRotation} ${slice.labelX} ${slice.labelY})`"
+                    class="wheel-svg-label"
+                  >
+                    <tspan
+                      v-for="(line, lineIndex) in slice.labelLines"
+                      :key="`${slice.id}-${lineIndex}`"
+                      :x="slice.labelX"
+                      :dy="lineIndex === 0 ? slice.firstLineDy : 14"
+                    >
+                      {{ line }}
+                    </tspan>
+                  </text>
+                </g>
+              </g>
+              <circle cx="150" cy="150" r="42" class="wheel-center-circle" />
+              <text x="150" y="155" text-anchor="middle" class="wheel-center-text">START</text>
+            </svg>
+          </div>
+
+          <div class="wheel-controls">
+            <div class="probability-total" :class="{ invalid: manualProbabilityTotal > 100 }">
+              직접 설정 {{ manualProbabilityTotal }}% / 무사 통과 자동 {{ autoSafeProbability }}%
+            </div>
+            <div v-for="(item, index) in wheelItems" :key="item.id" class="wheel-item-row">
+              <span class="color-dot" :style="{ background: item.color }"></span>
+              <input v-model="item.label" class="input-field wheel-label" aria-label="벌칙 내용" />
+              <input
+                :value="item.isAuto ? autoSafeProbability : item.probability"
+                :disabled="item.isAuto"
+                @input="item.probability = Number($event.target.value)"
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                class="input-field wheel-probability"
+                aria-label="벌칙 확률"
+              />
+              <span class="percent-mark">%</span>
+              <button class="icon-btn" type="button" @click="removeWheelItem(index)" :disabled="item.isAuto || wheelItems.length <= 2">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+            <button class="btn btn-outline tool-small-btn" type="button" @click="addWheelItem">
+              <i class="fa-solid fa-plus"></i> 벌칙 추가
+            </button>
+          </div>
         </div>
-        <button class="btn btn-red" @click="drawPenalty">뽑기!</button>
+
+        <p v-if="wheelError" class="tool-error">{{ wheelError }}</p>
+        <div v-if="penaltyResult" class="tool-result-text">결과: {{ penaltyResult }}</div>
+        <button class="btn btn-red" :disabled="wheelSpinning" @click="spinPenaltyWheel">
+          <i class="fa-solid fa-rotate"></i> {{ wheelSpinning ? '도는 중...' : '원판 돌리기' }}
+        </button>
       </template>
 
       <template v-else>
-        <h2 style="color: var(--primary-color);">누가 먼저 할래?</h2>
-        <p style="color: var(--text-light);">공평하게 랜덤으로 결정</p>
-        <input v-model.number="playerCount" type="number" class="input-field" placeholder="몇 명인가요?" min="2" max="10" style="text-align: center; width: 50%;" />
-        <div class="card tool-result">
-          <p style="font-weight: bold; color: var(--text-light);">
-            <span v-if="turnResult" style="color: var(--primary-color); font-size: 1.2rem;">순서: {{ turnResult.join(' -> ') }}</span>
-            <span v-else>인원을 입력하고 뽑아주세요</span>
-          </p>
+        <h2 class="tool-title">사다리 순서 뽑기</h2>
+        <p class="tool-subtitle">사람 이름을 등록한 뒤 사다리를 만들고 클릭해 첫 번째 순서를 뽑으세요.</p>
+
+        <div class="name-entry">
+          <input v-model="playerNameInput" class="input-field" placeholder="이름 입력" @keyup.enter="addPlayerName" />
+          <button class="btn btn-brown name-add-btn" type="button" @click="addPlayerName">
+            <i class="fa-solid fa-plus"></i> 추가
+          </button>
         </div>
-        <button class="btn btn-brown" @click="decideTurn">뽑기!</button>
+
+        <p v-if="!playerNames.length" class="tool-empty">아직 등록된 사람이 없습니다.</p>
+
+        <div class="player-chip-list">
+          <span v-for="(name, index) in playerNames" :key="name" class="player-chip">
+            {{ name }}
+            <button type="button" @click="removePlayerName(index)">&times;</button>
+          </span>
+        </div>
+
+        <button class="btn btn-brown" type="button" @click="generateLadder">
+          <i class="fa-solid fa-shuffle"></i> 사다리 만들기
+        </button>
+
+        <div v-if="ladderReady" class="ladder-wrap" @click="drawFirstTurn">
+          <svg class="ladder-svg" :viewBox="`0 0 ${ladderWidth} ${ladderHeight}`" role="img" aria-label="사다리">
+            <line
+              v-for="(_, index) in playerNames"
+              :key="`rail-${index}`"
+              :x1="ladderX(index)"
+              y1="16"
+              :x2="ladderX(index)"
+              :y2="ladderHeight - 16"
+              class="ladder-rail-line"
+            />
+            <line
+              v-for="rung in ladderRungs"
+              :key="rung.id"
+              :x1="ladderX(rung.left)"
+              :y1="ladderY(rung.row)"
+              :x2="ladderX(rung.left + 1)"
+              :y2="ladderY(rung.row)"
+              class="ladder-rung-line"
+            />
+            <polyline v-if="ladderPathPoints" :points="ladderPathPoints" class="ladder-path" />
+          </svg>
+          <div class="ladder-bottom" :style="{ gridTemplateColumns: `repeat(${playerNames.length}, 1fr)` }">
+            <span
+              v-for="(name, index) in ladderBottomNames"
+              :key="`${name}-${index}`"
+              :class="{ revealed: ladderResult && ladderEndIndex === index }"
+            >
+              {{ ladderResult && ladderEndIndex === index ? name : '?' }}
+            </span>
+          </div>
+          <p class="ladder-hint">{{ ladderResult ? '다시 누르면 새로 뽑아요.' : '아무 사다리나 누르면 아래 사람이 공개돼요.' }}</p>
+        </div>
+
+        <div v-if="ladderResult" class="turn-result-text">{{ ladderResult }} 선턴!</div>
       </template>
     </div>
   </div>
@@ -187,7 +303,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 
 const view = ref('main')
 const games = ref([])
@@ -199,8 +315,18 @@ const aiError = ref('')
 const aiRecommendations = ref([])
 const toolModal = ref('')
 const penaltyResult = ref('')
-const playerCount = ref(null)
-const turnResult = ref([])
+const wheelRotation = ref(0)
+const wheelSpinning = ref(false)
+const wheelError = ref('')
+const playerNameInput = ref('')
+const playerNames = ref([])
+const ladderRows = ref([])
+const ladderReady = ref(false)
+const ladderResult = ref('')
+const ladderStartIndex = ref(null)
+const ladderEndIndex = ref(null)
+const ladderPath = ref([])
+const ladderBottomNames = ref([])
 const gameModal = reactive({
   open: false,
   loading: false,
@@ -211,7 +337,61 @@ const gameModal = reactive({
   youtubeVideoId: ''
 })
 
-const penalties = ['핸디캡 받기', '설거지 하기', '음료수 사기', '뒷정리 하기', '한 턴 쉬기', '무사 통과!']
+const wheelColors = ['#c45b4c', '#e0ac5f', '#5d3f2e', '#6e9f84', '#6f88b8', '#a491bc', '#d7837f']
+const ladderHeight = 260
+const ladderMargin = 30
+const wheelItems = ref([
+  { id: 1, label: '설거지 하기', probability: 25, color: wheelColors[0] },
+  { id: 2, label: '음료수 사기', probability: 25, color: wheelColors[1] },
+  { id: 3, label: '뒷정리 하기', probability: 20, color: wheelColors[2] },
+  { id: 4, label: '한 턴 쉬기', probability: 15, color: wheelColors[3] },
+  { id: 5, label: '무사 통과', probability: 15, color: wheelColors[4], isAuto: true }
+])
+let nextWheelId = 6
+
+const manualProbabilityTotal = computed(() => {
+  return wheelItems.value
+    .filter((item) => !item.isAuto)
+    .reduce((sum, item) => sum + normalizePercent(item.probability), 0)
+})
+const autoSafeProbability = computed(() => Math.max(0, 100 - manualProbabilityTotal.value))
+const adjustedWheelItems = computed(() => {
+  return wheelItems.value.map((item) => ({
+    ...item,
+    probability: item.isAuto ? autoSafeProbability.value : normalizePercent(item.probability)
+  }))
+})
+
+const wheelSlices = computed(() => {
+  let cursor = 0
+  return adjustedWheelItems.value
+    .filter((item) => item.label.trim() && normalizePercent(item.probability) > 0)
+    .map((item) => {
+      const amount = normalizePercent(item.probability)
+      const startAngle = cursor * 3.6 - 90
+      const endAngle = (cursor + amount) * 3.6 - 90
+      const centerAngle = startAngle + (endAngle - startAngle) / 2
+      cursor += amount
+      const labelPoint = polarToCartesian(150, 150, 92, centerAngle)
+      const labelLines = splitWheelLabel(item.label.trim())
+      return {
+        id: item.id,
+        color: item.color,
+        path: describeArcSlice(150, 150, 138, startAngle, endAngle),
+        labelX: labelPoint.x,
+        labelY: labelPoint.y,
+        textRotation: centerAngle + 90,
+        labelLines,
+        firstLineDy: labelLines.length > 1 ? -6 : 4
+      }
+    })
+})
+
+const ladderWidth = computed(() => Math.max(280, (playerNames.value.length - 1) * 86 + ladderMargin * 2))
+const ladderRungs = computed(() => {
+  return ladderRows.value.flatMap((row, rowIndex) => row.map((left) => ({ id: `${rowIndex}-${left}`, row: rowIndex, left })))
+})
+const ladderPathPoints = computed(() => ladderPath.value.map((point) => `${point.x},${point.y}`).join(' '))
 
 onMounted(() => {
   fetchFilteredGames()
@@ -279,22 +459,207 @@ function closeToolModal() {
   toolModal.value = ''
 }
 
-function drawPenalty() {
-  penaltyResult.value = penalties[Math.floor(Math.random() * penalties.length)]
+function normalizePercent(value) {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return 0
+  return Math.max(0, Math.min(100, Math.round(number)))
 }
 
-function decideTurn() {
-  if (!playerCount.value || playerCount.value < 2) {
-    alert('2명 이상 입력해주세요!')
+function polarToCartesian(cx, cy, radius, angleInDegrees) {
+  const angleInRadians = (angleInDegrees * Math.PI) / 180
+  return {
+    x: cx + radius * Math.cos(angleInRadians),
+    y: cy + radius * Math.sin(angleInRadians)
+  }
+}
+
+function describeArcSlice(cx, cy, radius, startAngle, endAngle) {
+  const start = polarToCartesian(cx, cy, radius, startAngle)
+  const end = polarToCartesian(cx, cy, radius, endAngle)
+  const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1'
+  return [
+    `M ${cx} ${cy}`,
+    `L ${start.x} ${start.y}`,
+    `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`,
+    'Z'
+  ].join(' ')
+}
+
+function splitWheelLabel(label) {
+  if (label.length <= 5) return [label]
+  const words = label.split(/\s+/).filter(Boolean)
+  if (words.length > 1) {
+    const lines = []
+    let line = ''
+    words.forEach((word) => {
+      const nextLine = line ? `${line} ${word}` : word
+      if (nextLine.length > 5 && line) {
+        lines.push(line)
+        line = word
+      } else {
+        line = nextLine
+      }
+    })
+    if (line) lines.push(line)
+    return lines.slice(0, 2)
+  }
+  return [label.slice(0, 5), label.slice(5, 10)].filter(Boolean)
+}
+
+function addWheelItem() {
+  wheelItems.value.push({
+    id: nextWheelId++,
+    label: '새 벌칙',
+    probability: 1,
+    color: wheelColors[wheelItems.value.length % wheelColors.length]
+  })
+}
+
+function removeWheelItem(index) {
+  if (wheelItems.value.length <= 2) return
+  wheelItems.value.splice(index, 1)
+}
+
+function spinPenaltyWheel() {
+  if (wheelSpinning.value) return
+  wheelError.value = ''
+  penaltyResult.value = ''
+
+  const validItems = adjustedWheelItems.value.filter((item) => item.label.trim() && normalizePercent(item.probability) > 0)
+  if (validItems.length < 2) {
+    wheelError.value = '벌칙을 2개 이상 입력해주세요.'
+    return
+  }
+  if (manualProbabilityTotal.value > 100) {
+    wheelError.value = '무사 통과를 제외한 확률 합계가 100%를 넘지 않게 조정해주세요.'
     return
   }
 
-  const arr = Array.from({ length: playerCount.value }, (_, i) => i + 1)
+  const randomPoint = Math.random() * 100
+  let cursor = 0
+  let selected = validItems[0]
+  let selectedStart = 0
+
+  for (const item of validItems) {
+    const amount = normalizePercent(item.probability)
+    if (randomPoint >= cursor && randomPoint < cursor + amount) {
+      selected = item
+      selectedStart = cursor
+      break
+    }
+    cursor += amount
+  }
+
+  const selectedCenterAngle = (selectedStart + normalizePercent(selected.probability) / 2) * 3.6
+  const currentAngle = ((wheelRotation.value % 360) + 360) % 360
+  const landingDelta = (360 - selectedCenterAngle - currentAngle + 360) % 360
+
+  wheelSpinning.value = true
+  wheelRotation.value += 1440 + landingDelta
+  window.setTimeout(() => {
+    penaltyResult.value = selected.label
+    wheelSpinning.value = false
+  }, 4300)
+}
+
+function addPlayerName() {
+  const name = playerNameInput.value.trim()
+  if (!name) return
+  if (!playerNames.value.includes(name)) playerNames.value.push(name)
+  playerNameInput.value = ''
+  resetLadder()
+}
+
+function removePlayerName(index) {
+  playerNames.value.splice(index, 1)
+  resetLadder()
+}
+
+function resetLadder() {
+  ladderReady.value = false
+  ladderResult.value = ''
+  ladderStartIndex.value = null
+  ladderEndIndex.value = null
+  ladderPath.value = []
+  ladderBottomNames.value = []
+}
+
+function generateLadder() {
+  if (playerNames.value.length < 2) {
+    alert('이름을 2명 이상 등록해주세요.')
+    return
+  }
+
+  const rowCount = Math.max(6, playerNames.value.length * 2)
+  const rows = []
+  for (let row = 0; row < rowCount; row++) {
+    const rungs = []
+    let column = 0
+    while (column < playerNames.value.length - 1) {
+      if (Math.random() > 0.56) {
+        rungs.push(column)
+        column += 2
+      } else {
+        column += 1
+      }
+    }
+    rows.push(rungs)
+  }
+
+  ladderRows.value = rows
+  ladderBottomNames.value = shuffleNames(playerNames.value)
+  ladderReady.value = true
+  ladderResult.value = ''
+  ladderStartIndex.value = null
+  ladderEndIndex.value = null
+  ladderPath.value = []
+}
+
+function drawFirstTurn() {
+  if (!ladderReady.value || !ladderRows.value.length) return
+
+  let position = Math.floor(Math.random() * playerNames.value.length)
+  const startIndex = position
+  const path = [{ x: ladderX(position), y: 16 }]
+
+  ladderRows.value.forEach((row, rowIndex) => {
+    const y = ladderY(rowIndex)
+    path.push({ x: ladderX(position), y })
+    if (row.includes(position)) {
+      position += 1
+      path.push({ x: ladderX(position), y })
+    } else if (row.includes(position - 1)) {
+      position -= 1
+      path.push({ x: ladderX(position), y })
+    }
+  })
+
+  path.push({ x: ladderX(position), y: ladderHeight - 16 })
+  ladderStartIndex.value = startIndex
+  ladderEndIndex.value = position
+  ladderPath.value = path
+  ladderResult.value = ladderBottomNames.value[position]
+}
+
+function shuffleNames(names) {
+  const arr = [...names]
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
     ;[arr[i], arr[j]] = [arr[j], arr[i]]
   }
-  turnResult.value = arr
+  return arr
+}
+
+function ladderX(index) {
+  if (playerNames.value.length <= 1) return ladderWidth.value / 2
+  const gap = (ladderWidth.value - ladderMargin * 2) / (playerNames.value.length - 1)
+  return ladderMargin + index * gap
+}
+
+function ladderY(rowIndex) {
+  if (ladderRows.value.length <= 1) return ladderHeight / 2
+  const gap = (ladderHeight - 60) / (ladderRows.value.length - 1)
+  return 30 + rowIndex * gap
 }
 
 async function openGameModal(gameId, title) {
