@@ -19,3 +19,6 @@ db.sqlite3-journal
 # Data Files
 *.csv
 dummy_reviews_gen.json
+
+# User uploads
+media/

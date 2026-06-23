@@ -1,28 +1,85 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="card" style="max-width: 600px; margin: 0 auto;">
-    <h2 style="color:var(--primary-color);">{{ person.username }}님의 프로필</h2>
-    
-    <div style="display:flex; justify-content:space-around; margin: 2rem 0;">
-        <div>
-            <div style="font-size:2rem; font-weight:bold; color:var(--text-dark);" id="followersCount">{{ person.followers.all|length }}</div>
-            <div style="color:var(--text-light);">팔로워</div>
+<section class="profile-layout">
+    <div class="card profile-card">
+        <div class="profile-top">
+            <div class="profile-avatar">
+                {% if person.profile_image %}
+                    <img src="{{ person.profile_image.url }}" alt="{{ person.username }} 프로필 사진">
+                {% else %}
+                    <span>{{ person.username|first|upper }}</span>
+                {% endif %}
+            </div>
+            <div class="profile-title">
+                <h2>{{ person.username }}님의 프로필</h2>
+                <p>보드게임 취향과 낙서를 모아보는 공간</p>
+            </div>
         </div>
-        <div>
-            <div style="font-size:2rem; font-weight:bold; color:var(--text-dark);" id="followingsCount">{{ person.followings.all|length }}</div>
-            <div style="color:var(--text-light);">팔로잉</div>
+
+        <div class="profile-stats">
+            <div>
+                <strong id="followersCount">{{ person.followers.all|length }}</strong>
+                <span>팔로워</span>
+            </div>
+            <div>
+                <strong id="followingsCount">{{ person.followings.all|length }}</strong>
+                <span>팔로잉</span>
+            </div>
+            <div>
+                <strong>{{ articles|length }}</strong>
+                <span>낙서</span>
+            </div>
         </div>
+
+        {% if is_owner %}
+        <div class="profile-actions">
+            <a href="{% url 'accounts:profile_edit' %}" class="btn btn-yellow">프로필 꾸미기</a>
+            <a href="{% url 'accounts:account_settings' %}" class="btn btn-outline">계정 관리</a>
+        </div>
+        {% elif user.is_authenticated %}
+        <form id="followForm" data-user-id="{{ person.pk }}">
+            {% csrf_token %}
+            <button type="submit" id="followBtn" class="btn {% if user in person.followers.all %}btn-outline{% else %}btn-brown{% endif %}">
+                {% if user in person.followers.all %}언팔로우{% else %}팔로우{% endif %}
+            </button>
+        </form>
+        {% endif %}
     </div>
 
-    {% if user.is_authenticated and user != person %}
-    <form id="followForm" data-user-id="{{ person.pk }}">
-        {% csrf_token %}
-        <button type="submit" id="followBtn" class="btn {% if user in person.followers.all %}btn-outline{% else %}btn-brown{% endif %}">
-            {% if user in person.followers.all %}언팔로우{% else %}팔로우{% endif %}
-        </button>
-    </form>
-    {% endif %}
-</div>
+    <div class="card profile-section">
+        <h3>최애 보드게임</h3>
+        {% if person.favorite_game_tag_list %}
+            <div class="favorite-game-list">
+                {% for tag in person.favorite_game_tag_list %}
+                    <span class="favorite-game-chip hashtag-chip">#{{ tag }}</span>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty-profile-text">아직 등록한 최애 보드게임 태그가 없습니다.</p>
+        {% endif %}
+    </div>
+
+    <div class="card profile-section">
+        <h3>내가 쓴 낙서</h3>
+        {% if articles %}
+            <div class="profile-article-list">
+                {% for article in articles %}
+                    <article class="profile-article-item">
+                        <p>{{ article.content }}</p>
+                        <div>
+                            <span>{{ article.created_at|date:"Y.m.d H:i" }}</span>
+                            {% if is_owner %}
+                                <a href="{% url 'community:update' article.pk %}">수정</a>
+                            {% endif %}
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty-profile-text">아직 작성한 낙서가 없습니다.</p>
+        {% endif %}
+    </div>
+</section>
 
 <script>
     const form = document.querySelector('#followForm')

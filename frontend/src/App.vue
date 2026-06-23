@@ -14,8 +14,16 @@
         <i class="fa-solid fa-route"></i> 순서
       </button>
       <a href="/community/"><i class="fa-regular fa-comment"></i> 낙서장</a>
-      <a href="/accounts/login/">로그인</a>
-      <a href="/accounts/signup/">회원가입</a>
+      <template v-if="currentUser.isAuthenticated">
+        <a :href="currentUser.profileUrl"><i class="fa-regular fa-user"></i> {{ currentUser.username }}</a>
+        <form class="navbar-logout-form" @submit.prevent="logoutUser">
+          <button type="submit">로그아웃</button>
+        </form>
+      </template>
+      <template v-else>
+        <a href="/accounts/login/">로그인</a>
+        <a href="/accounts/signup/">회원가입</a>
+      </template>
     </div>
   </nav>
 
@@ -365,6 +373,11 @@ const situation = ref('')
 const aiLoading = ref(false)
 const aiError = ref('')
 const aiRecommendations = ref([])
+const currentUser = reactive({
+  isAuthenticated: false,
+  username: '',
+  profileUrl: ''
+})
 const toolModal = ref('')
 const penaltyResult = ref('')
 const wheelRotation = ref(0)
@@ -401,7 +414,7 @@ const wheelItems = ref([
   { id: 1, label: '꿀밤 맞기', probability: 25, color: wheelColors[0] },
   { id: 2, label: '커피 사기', probability: 25, color: wheelColors[1] },
   { id: 3, label: '뒷정리 하기', probability: 20, color: wheelColors[2] },
-  { id: 4, label: '10분간 말 못하기', probability: 15, color: wheelColors[3] },
+  { id: 4, label: '10분간 말 못하기 ', probability: 15, color: wheelColors[3] },
   { id: 5, label: '무사 통과', probability: 15, color: wheelColors[4], isAuto: true }
 ])
 let nextWheelId = 6
@@ -451,6 +464,7 @@ const ladderRungs = computed(() => {
 const ladderPathPoints = computed(() => ladderPath.value.map((point) => `${point.x},${point.y}`).join(' '))
 
 onMounted(() => {
+  fetchCurrentUser()
   fetchFilteredGames()
   openInitialToolFromUrl()
 })
@@ -518,6 +532,40 @@ function openToolModal(type) {
 
 function closeToolModal() {
   toolModal.value = ''
+}
+
+async function fetchCurrentUser() {
+  try {
+    const response = await fetch('/accounts/me/', { credentials: 'same-origin' })
+    const data = await response.json()
+    currentUser.isAuthenticated = Boolean(data.is_authenticated)
+    currentUser.username = data.username || ''
+    currentUser.profileUrl = data.profile_url || ''
+  } catch {
+    currentUser.isAuthenticated = false
+  }
+}
+
+async function logoutUser() {
+  await fetch('/accounts/logout/', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken')
+    }
+  })
+  window.location.href = '/'
+}
+
+function getCookie(name) {
+  const cookies = document.cookie ? document.cookie.split(';') : []
+  for (const cookie of cookies) {
+    const trimmed = cookie.trim()
+    if (trimmed.startsWith(`${name}=`)) {
+      return decodeURIComponent(trimmed.slice(name.length + 1))
+    }
+  }
+  return ''
 }
 
 function normalizePercent(value) {

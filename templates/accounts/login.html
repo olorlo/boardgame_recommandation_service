@@ -8,7 +8,26 @@
 
         <form action="{% url 'accounts:login' %}" method="POST" class="auth-form">
             {% csrf_token %}
-            {{ form.as_p }}
+            {% if form.non_field_errors %}
+                <div class="form-errors">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <div class="auth-field">
+                <label for="{{ form.username.id_for_label }}">아이디</label>
+                {{ form.username }}
+                {% if form.username.errors %}
+                    <div class="form-errors">{{ form.username.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="auth-field">
+                <label for="{{ form.password.id_for_label }}">비밀번호</label>
+                {{ form.password }}
+                {% if form.password.errors %}
+                    <div class="form-errors">{{ form.password.errors }}</div>
+                {% endif %}
+            </div>
+
             <button type="submit" class="btn btn-brown auth-submit">로그인</button>
         </form>
 

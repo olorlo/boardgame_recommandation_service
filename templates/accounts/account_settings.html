@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="settings-layout">
+    <div class="card settings-card">
+        <h2>계정 관리</h2>
+        <p class="auth-subtitle">아이디, 비밀번호, 회원탈퇴를 관리해요.</p>
+
+        <form action="{% url 'accounts:account_settings' %}" method="POST" class="auth-form settings-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="account">
+            <h3>아이디 수정</h3>
+            <div class="auth-field">
+                <label for="{{ account_form.username.id_for_label }}">아이디</label>
+                {{ account_form.username }}
+                {% if account_form.username.errors %}
+                    <div class="form-errors">{{ account_form.username.errors }}</div>
+                {% endif %}
+            </div>
+            <button type="submit" class="btn btn-yellow auth-submit">아이디 저장</button>
+        </form>
+    </div>
+
+    <div class="card settings-card">
+        <form action="{% url 'accounts:account_settings' %}" method="POST" class="auth-form settings-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="password">
+            <h3>비밀번호 변경</h3>
+            {% if password_form.non_field_errors %}
+                <div class="form-errors">{{ password_form.non_field_errors }}</div>
+            {% endif %}
+            {% for field in password_form %}
+                <div class="auth-field">
+                    <label for="{{ field.id_for_label }}">
+                        {% if field.name == 'old_password' %}현재 비밀번호{% elif field.name == 'new_password1' %}새 비밀번호{% else %}새 비밀번호 확인{% endif %}
+                    </label>
+                    {{ field }}
+                    {% if field.errors %}
+                        <div class="form-errors">{{ field.errors }}</div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-brown auth-submit">비밀번호 변경</button>
+        </form>
+    </div>
+
+    <div class="card settings-card danger-card">
+        <form action="{% url 'accounts:account_settings' %}" method="POST" class="auth-form settings-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete">
+            <h3>회원탈퇴</h3>
+            <p class="profile-note">탈퇴하면 계정과 프로필 정보가 삭제돼요. 작성한 낙서도 함께 삭제됩니다.</p>
+            {% if delete_error %}
+                <div class="form-errors">{{ delete_error }}</div>
+            {% endif %}
+            <div class="auth-field">
+                <label for="delete_confirm">확인을 위해 아이디를 입력하세요</label>
+                <input id="delete_confirm" name="delete_confirm" type="text" placeholder="{{ user.username }}">
+            </div>
+            <button type="submit" class="btn btn-red auth-submit">회원탈퇴</button>
+        </form>
+    </div>
+
+    <a href="{% url 'accounts:profile' user.pk %}" class="auth-link">프로필로 돌아가기</a>
+</section>
+{% endblock %}
