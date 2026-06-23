@@ -13,7 +13,7 @@
       <button type="button" :class="{ active: toolModal === 'turn' }" @click="openToolModal('turn')">
         <i class="fa-solid fa-route"></i> 순서
       </button>
-      <a href="/community/"><i class="fa-regular fa-comment"></i> 커뮤니티</a>
+      <a href="/community/"><i class="fa-regular fa-comment"></i> 낙서장</a>
       <a href="/accounts/login/">로그인</a>
       <a href="/accounts/signup/">회원가입</a>
     </div>
@@ -202,7 +202,7 @@
 
       <template v-else>
         <h2 class="tool-title">사다리 순서 뽑기</h2>
-        <p class="tool-subtitle">사람 이름을 등록한 뒤 사다리를 만들고 클릭해 첫 번째 순서를 뽑으세요.</p>
+        <p class="tool-subtitle">사람 이름을 등록한 뒤 사다리 위쪽 시작점을 눌러 첫 번째 순서를 뽑으세요.</p>
 
         <div class="name-entry">
           <input v-model="playerNameInput" class="input-field" placeholder="이름 입력" @keyup.enter="addPlayerName" />
@@ -224,7 +224,20 @@
           <i class="fa-solid fa-shuffle"></i> 사다리 만들기
         </button>
 
-        <div v-if="ladderReady" class="ladder-wrap" @click="drawFirstTurn">
+        <div v-if="ladderReady" class="ladder-wrap">
+          <div class="ladder-start-row" :style="{ gridTemplateColumns: `repeat(${playerNames.length}, 1fr)` }">
+            <button
+              v-for="(_, index) in playerNames"
+              :key="`start-${index}`"
+              type="button"
+              class="ladder-start-button"
+              :class="{ active: ladderStartIndex === index && (ladderAnimating || ladderResult) }"
+              @click="drawFirstTurn(index)"
+            >
+              <i class="fa-solid fa-arrow-down"></i>
+              <span>시작</span>
+            </button>
+          </div>
           <svg class="ladder-svg" :viewBox="`0 0 ${ladderWidth} ${ladderHeight}`" role="img" aria-label="사다리">
             <line
               v-for="(_, index) in playerNames"
@@ -244,7 +257,7 @@
               :y2="ladderY(rung.row)"
               class="ladder-rung-line"
             />
-            <polyline v-if="ladderPathPoints" :points="ladderPathPoints" class="ladder-path" />
+            <polyline v-if="ladderPathPoints" :key="ladderRunKey" :points="ladderPathPoints" class="ladder-path" />
           </svg>
           <div class="ladder-bottom" :style="{ gridTemplateColumns: `repeat(${playerNames.length}, 1fr)` }">
             <span
@@ -255,7 +268,9 @@
               {{ ladderResult && ladderEndIndex === index ? name : '?' }}
             </span>
           </div>
-          <p class="ladder-hint">{{ ladderResult ? '다시 누르면 새로 뽑아요.' : '아무 사다리나 누르면 아래 사람이 공개돼요.' }}</p>
+          <p class="ladder-hint">
+            {{ ladderResult ? '위쪽 시작점을 다시 누르면 새로 뽑아요.' : '위쪽 시작 버튼을 누르면 아래 사람이 공개돼요.' }}
+          </p>
         </div>
 
         <div v-if="ladderResult" class="turn-result-text">{{ ladderResult }} 선턴!</div>
@@ -364,6 +379,9 @@ const ladderStartIndex = ref(null)
 const ladderEndIndex = ref(null)
 const ladderPath = ref([])
 const ladderBottomNames = ref([])
+const ladderAnimating = ref(false)
+const ladderRunKey = ref(0)
+let ladderTimer = null
 const gameModal = reactive({
   open: false,
   loading: false,
@@ -380,10 +398,10 @@ const wheelColors = ['#c45b4c', '#e0ac5f', '#5d3f2e', '#6e9f84', '#6f88b8', '#a4
 const ladderHeight = 260
 const ladderMargin = 30
 const wheelItems = ref([
-  { id: 1, label: '설거지 하기', probability: 25, color: wheelColors[0] },
-  { id: 2, label: '음료수 사기', probability: 25, color: wheelColors[1] },
+  { id: 1, label: '꿀밤 맞기', probability: 25, color: wheelColors[0] },
+  { id: 2, label: '커피 사기', probability: 25, color: wheelColors[1] },
   { id: 3, label: '뒷정리 하기', probability: 20, color: wheelColors[2] },
-  { id: 4, label: '한 턴 쉬기', probability: 15, color: wheelColors[3] },
+  { id: 4, label: '10분간 말 못하기', probability: 15, color: wheelColors[3] },
   { id: 5, label: '무사 통과', probability: 15, color: wheelColors[4], isAuto: true }
 ])
 let nextWheelId = 6
@@ -434,6 +452,7 @@ const ladderPathPoints = computed(() => ladderPath.value.map((point) => `${point
 
 onMounted(() => {
   fetchFilteredGames()
+  openInitialToolFromUrl()
 })
 
 function showMain() {
@@ -549,11 +568,13 @@ function splitWheelLabel(label) {
 }
 
 function addWheelItem() {
-  wheelItems.value.push({
+  const autoIndex = wheelItems.value.findIndex((item) => item.isAuto)
+  const insertIndex = autoIndex === -1 ? wheelItems.value.length : autoIndex
+  wheelItems.value.splice(insertIndex, 0, {
     id: nextWheelId++,
     label: '새 벌칙',
     probability: 1,
-    color: wheelColors[wheelItems.value.length % wheelColors.length]
+    color: wheelColors[insertIndex % wheelColors.length]
   })
 }
 
@@ -618,12 +639,15 @@ function removePlayerName(index) {
 }
 
 function resetLadder() {
+  if (ladderTimer) window.clearTimeout(ladderTimer)
+  ladderTimer = null
   ladderReady.value = false
   ladderResult.value = ''
   ladderStartIndex.value = null
   ladderEndIndex.value = null
   ladderPath.value = []
   ladderBottomNames.value = []
+  ladderAnimating.value = false
 }
 
 function generateLadder() {
@@ -631,6 +655,8 @@ function generateLadder() {
     alert('이름을 2명 이상 등록해주세요.')
     return
   }
+  if (ladderTimer) window.clearTimeout(ladderTimer)
+  ladderTimer = null
 
   const rowCount = Math.max(6, playerNames.value.length * 2)
   const rows = []
@@ -655,13 +681,16 @@ function generateLadder() {
   ladderStartIndex.value = null
   ladderEndIndex.value = null
   ladderPath.value = []
+  ladderAnimating.value = false
 }
 
-function drawFirstTurn() {
+function drawFirstTurn(startIndex) {
   if (!ladderReady.value || !ladderRows.value.length) return
+  if (ladderAnimating.value) return
+  if (startIndex < 0 || startIndex >= playerNames.value.length) return
+  if (ladderTimer) window.clearTimeout(ladderTimer)
 
-  let position = Math.floor(Math.random() * playerNames.value.length)
-  const startIndex = position
+  let position = startIndex
   const path = [{ x: ladderX(position), y: 16 }]
 
   ladderRows.value.forEach((row, rowIndex) => {
@@ -680,7 +709,25 @@ function drawFirstTurn() {
   ladderStartIndex.value = startIndex
   ladderEndIndex.value = position
   ladderPath.value = path
-  ladderResult.value = ladderBottomNames.value[position]
+  ladderRunKey.value += 1
+  ladderResult.value = ''
+  ladderAnimating.value = true
+
+  const result = ladderBottomNames.value[position]
+  ladderTimer = window.setTimeout(() => {
+    ladderResult.value = result
+    ladderAnimating.value = false
+    ladderTimer = null
+  }, 700)
+}
+
+function openInitialToolFromUrl() {
+  const params = new URLSearchParams(window.location.search)
+  const tool = params.get('tool')
+  if (tool === 'penalty' || tool === 'turn') {
+    openToolModal(tool)
+    window.history.replaceState({}, '', window.location.pathname)
+  }
 }
 
 function shuffleNames(names) {

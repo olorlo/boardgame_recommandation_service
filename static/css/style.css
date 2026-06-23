@@ -26,6 +26,7 @@ body {
   padding: 1rem 3rem;
   background-color: var(--bg-color);
   border-bottom: 2px solid #eadecc;
+  gap: 1rem;
 }
 .navbar-brand {
   font-size: 1.5rem;
@@ -36,15 +37,31 @@ body {
   align-items: center;
   gap: 8px;
 }
-.navbar-links a {
+.navbar-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.navbar-logout-form {
+  margin: 0;
+  display: inline-flex;
+}
+.navbar-links a,
+.navbar-links button {
   text-decoration: none;
   color: var(--text-light);
   font-weight: 600;
-  margin-left: 2rem;
-  padding-bottom: 5px;
+  padding: 0 0 5px;
   transition: all 0.2s;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-size: 1rem;
 }
-.navbar-links a:hover, .navbar-links a.active {
+.navbar-links a:hover,
+.navbar-links a.active,
+.navbar-links button:hover {
   color: var(--accent-color);
   border-bottom: 3px solid var(--accent-color);
 }
@@ -781,10 +798,6 @@ h1 {
     padding: 1rem;
     align-items: flex-start;
     flex-direction: column;
-  }
-  .navbar-links a {
-    margin-left: 0;
-    margin-right: 1rem;
   }
   .compose-form {
     flex-direction: column;

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>뭐할게임?</title>
     {% load static %}
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=3">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=4">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
@@ -15,14 +15,15 @@
         </a>
         <div class="navbar-links">
             <a href="{% url 'index' %}" class="{% if request.path == '/' or request.path == '/boardgames/' %}active{% endif %}"><i class="fa-solid fa-link"></i> 추천</a>
-            <a href="#" id="navPenaltyBtn"><i class="fa-regular fa-square"></i> 벌칙/순서</a>
+            <a href="/?tool=penalty"><i class="fa-solid fa-circle-exclamation"></i> 벌칙</a>
+            <a href="/?tool=turn"><i class="fa-solid fa-route"></i> 순서</a>
             <a href="{% url 'community:index' %}" class="{% if 'community' in request.path %}active{% endif %}"><i class="fa-regular fa-comment"></i> 낙서장</a>
             
             {% if user.is_authenticated %}
                 <a href="{% url 'accounts:profile' user.pk %}"><i class="fa-regular fa-user"></i> {{ user.username }}</a>
-                <form action="{% url 'accounts:logout' %}" method="post" style="display:inline;">
+                <form action="{% url 'accounts:logout' %}" method="post" class="navbar-logout-form">
                     {% csrf_token %}
-                    <button type="submit" style="background:none; border:none; color:var(--text-light); font-weight:600; cursor:pointer; font-size:1rem; margin-left:1rem;">로그아웃</button>
+                    <button type="submit">로그아웃</button>
                 </form>
             {% else %}
                 <a href="{% url 'accounts:login' %}">로그인</a>
@@ -36,21 +37,6 @@
         {% endblock %}
     </main>
 
-    <!-- Global Modals -->
-    <div class="modal-overlay" id="toolModal">
-        <div class="modal-content retro-window" style="padding: 3px;">
-            <div class="retro-titlebar">
-                <span id="retroModalTitle"><i class="fa-solid fa-triangle-exclamation"></i> 시스템 메시지</span>
-                <div class="retro-titlebar-close" onclick="closeToolModal()">X</div>
-            </div>
-            <div class="retro-content-inner">
-                <div id="toolModalBody">
-                    <!-- Tool content injected here -->
-                </div>
-                <div style="margin-top: 15px; font-size: 0.75rem; color: var(--text-light); text-align: right;">※ 클릭은 자유, 결과는 책임 안 짐</div>
-            </div>
-        </div>
-    </div>
 
     <!-- B-grade Retro Ads (Bottom Right) -->
     <div style="position: fixed; bottom: 20px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 15px; pointer-events: none;">
@@ -127,83 +113,7 @@
 
     <script>
         function openToolModal(type) {
-            const overlay = document.getElementById('toolModal');
-            const body = document.getElementById('toolModalBody');
-            const titleEl = document.getElementById('retroModalTitle');
-            overlay.style.display = 'flex';
-            
-            if (type === 'penalty') {
-                titleEl.innerHTML = '<i class="fa-solid fa-skull"></i> 벌칙_프로그램.exe';
-                body.innerHTML = `
-                    <div style="margin-bottom:20px; text-align: left;">
-                        <button class="btn btn-red" style="width:auto; padding:0.4rem 0.8rem; box-shadow:none; font-size:0.9rem; border-radius: 0; border: 2px outset #eadecc;">벌칙 뽑기</button>
-                        <button class="btn btn-brown" style="width:auto; padding:0.4rem 0.8rem; box-shadow:none; font-size:0.9rem; opacity:0.7; border-radius: 0; border: 2px outset #eadecc;" onclick="openToolModal('turn')">순서 정하기</button>
-                    </div>
-                    <h2 style="color:var(--primary-color);">오늘의 희생자는?</h2>
-                    <p style="color:var(--text-light);">불만 있기 없기? ㅋㅋ</p>
-                    <div class="card" style="margin:20px 0; background:var(--box-bg); border:none; cursor:pointer;" id="drawArea">
-                        <i class="fa-regular fa-hand" style="font-size:3rem; color:var(--text-light); margin-bottom:10px;"></i>
-                        <p id="drawResultText" style="font-weight:bold; color:var(--text-light);">아래 버튼을 눌러 뽑으세요</p>
-                    </div>
-                    <button class="btn btn-red" onclick="drawPenalty()">↓ 뽑기!</button>
-                `;
-            } else if (type === 'turn') {
-                titleEl.innerHTML = '<i class="fa-solid fa-users"></i> 순서_추첨기.exe';
-                body.innerHTML = `
-                    <div style="margin-bottom:20px; text-align: left;">
-                        <button class="btn btn-brown" style="width:auto; padding:0.4rem 0.8rem; box-shadow:none; font-size:0.9rem; opacity:0.7; border-radius: 0; border: 2px outset #eadecc;" onclick="openToolModal('penalty')">벌칙 뽑기</button>
-                        <button class="btn btn-red" style="width:auto; padding:0.4rem 0.8rem; box-shadow:none; font-size:0.9rem; background-color:#3a5a80; border-radius: 0; border: 2px outset #eadecc;">순서 정하기</button>
-                    </div>
-                    <h2 style="color:var(--primary-color);">누가 먼저 할래?</h2>
-                    <p style="color:var(--text-light);">공평하게 랜덤으로 ㄱㄱ</p>
-                    <div style="margin:10px 0;">
-                        <input type="number" id="playerCount" class="input-field" placeholder="몇 명인가요?" min="2" max="10" style="text-align:center; width:50%;">
-                    </div>
-                    <div class="card" style="margin:20px 0; background:var(--box-bg); border:none; padding:1rem;" id="turnArea">
-                        <p id="turnResultText" style="font-weight:bold; color:var(--text-light);">인원수를 입력하고 뽑아주세요</p>
-                    </div>
-                    <button class="btn btn-brown" onclick="decideTurn()">↓ 뽑기!</button>
-                `;
-            }
-        }
-
-        function closeToolModal() {
-            document.getElementById('toolModal').style.display = 'none';
-        }
-
-        function drawPenalty() {
-            const penalties = ["인디안 밥", "딱밤 맞기", "음료수 쏘기", "뒷정리 하기", "심부름 1회", "무사 통과!"];
-            const r = Math.floor(Math.random() * penalties.length);
-            const textEl = document.getElementById('drawResultText');
-            
-            textEl.innerHTML = `<span style="color:var(--accent-color); font-size:1.5rem;">${penalties[r]}</span>`;
-        }
-
-        function decideTurn() {
-            const count = parseInt(document.getElementById('playerCount').value);
-            if (!count || count < 2) {
-                alert("2명 이상 입력해주세요!");
-                return;
-            }
-            let arr = Array.from({length: count}, (_, i) => i + 1);
-            for (let i = arr.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [arr[i], arr[j]] = [arr[j], arr[i]];
-            }
-            const textEl = document.getElementById('turnResultText');
-            textEl.innerHTML = `<span style="color:var(--primary-color); font-size:1.2rem;">순서: ${arr.join(' ➔ ')}</span>`;
-        }
-
-        document.getElementById('navPenaltyBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            openToolModal('penalty');
-        });
-        
-        window.onclick = function(event) {
-            const modal = document.getElementById('toolModal');
-            if (event.target == modal) {
-                closeToolModal();
-            }
+            window.location.href = `/?tool=${type}`;
         }
     </script>
 </body>

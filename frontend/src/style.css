@@ -202,8 +202,7 @@ h1 {
 .games-grid,
 .detail-grid,
 .filter-row,
-.ai-row,
-.tool-tabs {
+.ai-row {
   display: flex;
   gap: 20px;
 }
@@ -268,30 +267,6 @@ h1 {
 .tool-subtitle {
   margin: 0 0 1.25rem;
   color: var(--text-light);
-}
-
-.tool-tabs {
-  justify-content: center;
-  margin-bottom: 1rem;
-}
-
-.tool-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0.55rem 0.25rem;
-  border: 0;
-  border-bottom: 3px solid transparent;
-  background: transparent;
-  color: var(--text-light);
-  font-size: 1rem;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.tool-tab.active {
-  color: var(--accent-color);
-  border-bottom-color: var(--accent-color);
 }
 
 .wheel-layout {
@@ -512,7 +487,39 @@ h1 {
   border-radius: 16px;
   background: #fff;
   border: 3px solid var(--box-bg);
+}
+
+.ladder-start-row {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 0.75rem;
+}
+
+.ladder-start-button {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0.55rem 0.35rem;
+  border: 2px solid rgba(196, 91, 76, 0.18);
+  border-radius: 10px;
+  background: #fff0ee;
+  color: var(--accent-color);
+  font-size: 0.86rem;
+  font-weight: 900;
   cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ladder-start-button:hover,
+.ladder-start-button.active {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(196, 91, 76, 0.18);
+}
+
+.ladder-start-button i {
+  animation: start-bounce 0.8s ease-in-out infinite;
 }
 
 .ladder-names {
@@ -585,6 +592,9 @@ h1 {
   stroke-linejoin: round;
   stroke-linecap: round;
   filter: drop-shadow(0 2px 4px rgba(196, 91, 76, 0.25));
+  stroke-dasharray: 2400;
+  stroke-dashoffset: 2400;
+  animation: ladder-run 0.65s ease-out forwards;
 }
 
 .ladder-hint {
@@ -592,6 +602,23 @@ h1 {
   color: var(--text-light);
   font-weight: 700;
   text-align: center;
+}
+
+@keyframes ladder-run {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes start-bounce {
+  0%,
+  100% {
+    transform: translateY(-1px);
+  }
+
+  50% {
+    transform: translateY(2px);
+  }
 }
 
 .youtube-box {
