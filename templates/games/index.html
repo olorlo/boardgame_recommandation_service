@@ -1,16 +1,16 @@
 {% extends 'base.html' %}
 {% block content %}
 <div id="mainView">
-    <div style="margin-bottom: 3rem;">
+    <div style="margin-bottom: 3rem; position: relative;">
         <i class="fa-solid fa-dice" style="font-size: 3rem; color: #a491bc;"></i>
         <h1>뭐할게임?</h1>
         <p class="subtitle">5명이서 할 거 없다고? 여기 있음 ㅋㅋ</p>
+        <div style="margin-top: 10px; font-size: 0.8rem; color: #999;">※ 버그는 컨셉입니다.</div>
     </div>
 
-    <div>
-        <button class="btn btn-yellow" onclick="showRecommendView()"><i class="fa-solid fa-dice-d20"></i> 게임 추천받기</button>
-        <button class="btn btn-red" onclick="openToolModal('penalty')"><i class="fa-solid fa-skull"></i> 벌칙 뽑기</button>
-        <button class="btn btn-brown" onclick="openToolModal('turn')"><i class="fa-solid fa-users"></i> 순서 정하기</button>
+    <div style="position: relative; display: inline-block;">
+        <button class="btn btn-yellow" onclick="showRecommendView()" style="position: relative; z-index: 2;"><i class="fa-solid fa-dice-d20"></i> 오늘도 게임 못 정함? 추천받기</button>
+        <div style="position: absolute; top: -15px; right: -15px; transform: rotate(15deg); background-color: yellow; color: red; font-weight: bold; font-size: 0.75rem; padding: 2px 5px; border: 1px solid red; z-index: 3; box-shadow: 2px 2px 0 rgba(0,0,0,0.2);">※ 친구 관계 파괴 주의</div>
     </div>
 </div>
 

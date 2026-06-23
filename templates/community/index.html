@@ -3,6 +3,14 @@
 <section class="page-header">
     <h2>낙서장</h2>
     <p class="subtitle">보드게임 이야기를 가볍게 남겨보세요.</p>
+    {% if tag_filter %}
+    <div style="margin-top: 15px;">
+        <span style="background: var(--box-bg); padding: 8px 15px; border-radius: 20px; font-weight: bold; color: var(--accent-color);">
+            <i class="fa-solid fa-tag"></i> {{ tag_filter }} 관련 글 모아보기
+            <a href="{% url 'community:index' %}" style="margin-left: 10px; color: var(--text-light); text-decoration: none;"><i class="fa-solid fa-xmark"></i></a>
+        </span>
+    </div>
+    {% endif %}
 </section>
 
 <!-- Actions Bar (Search + Compose Button) -->
@@ -57,6 +65,14 @@
         </div>
 
         <p class="note-content">{{ article.content }}</p>
+
+        {% if article.tags.all %}
+        <div class="note-tags" style="margin-top: 10px; margin-bottom: 10px;">
+            {% for tag in article.tags.all %}
+            <a href="{% url 'community:index' %}?tag={{ tag.name|urlencode }}" class="tag-badge" style="display: inline-block; background: var(--box-bg); color: var(--primary-color); padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; text-decoration: none; font-weight: bold; margin-right: 5px;">#{{ tag.name }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
 
         <div class="note-footer">
             <div class="note-like">

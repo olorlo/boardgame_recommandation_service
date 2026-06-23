@@ -6,6 +6,7 @@ urlpatterns = [
     path('', views.index, name='index'),
     path('<int:review_pk>/likes/', views.like, name='like'),
     path('create/', views.create, name='create'),
+    path('api/create/', views.api_create, name='api_create'),
     path('<int:article_pk>/update/', views.update, name='update'),
     path('<int:article_pk>/delete/', views.delete, name='delete'),
     path('<int:article_pk>/comments/', views.comment_create, name='comment_create'),

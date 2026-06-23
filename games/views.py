@@ -108,25 +108,39 @@ def recommend_game(request, game_id):
 @api_view(['POST'])
 def situation_recommend(request):
     try:
-        data = json.loads(request.body)
+        data = request.data
         situation = data.get('situation', '')
         
         gms_key = os.environ.get('GMS_KEY', '')
-        gms_endpoint = os.environ.get('GMS_ENDPOINT', 'https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent')
+        gms_endpoint = os.environ.get('GMS_ENDPOINT', 'https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions')
         if not gms_key:
             return JsonResponse({'error': 'GMS_KEY is not set.'}, status=500)
             
-        prompt = f"다음 상황에 맞는 보드게임 3개를 추천해주고, 이유를 짧게 설명해줘. 상황: {situation}. 반드시 JSON 형식으로만 반환해줘. 포맷: [{{\"title\": \"...\", \"reason\": \"...\"}}]"
-        url = f"{gms_endpoint}?key={gms_key}"
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        headers = {"Content-Type": "application/json"}
+        # DB에 있는 게임 목록 가져오기 (토큰 수 제한을 고려하여 인기 순 최대 300개로 제한)
+        db_games = list(BoardGames.objects.order_by('rank').values_list('title', flat=True)[:300])
+        game_list_str = ", ".join(db_games) if db_games else "(현재 DB에 게임이 없습니다)"
+        
+        prompt = f"다음은 우리 데이터베이스에 있는 보드게임 목록입니다: {game_list_str}\n\n이 목록에 있는 게임들 중에서만, 다음 상황에 맞는 보드게임 3개를 골라 추천해주고 이유를 짧게 설명해줘. 상황: {situation}. 인사말이나 부연 설명 없이 오직 JSON 배열만 출력해줘. 포맷: [{{\"title\": \"...\", \"reason\": \"...\"}}]"
+        url = gms_endpoint
+        payload = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}]}
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {gms_key}"
+        }
         
         res = requests.post(url, json=payload, headers=headers, timeout=60)
         res.raise_for_status()
         data = res.json()
         
-        text = data['candidates'][0]['content']['parts'][0]['text']
-        text = text.replace("```json", "").replace("```", "").strip()
+        text = data['choices'][0]['message']['content']
+        # Extract json using regex
+        import re
+        match = re.search(r'\[\s*\{.*?\}\s*\]', text, re.DOTALL)
+        if match:
+            text = match.group(0)
+        else:
+            text = text.replace("```json", "").replace("```", "").strip()
+            
         result = json.loads(text)
         
         return JsonResponse({'recommendations': result})
@@ -155,22 +169,24 @@ def details_by_title(request):
         video_id = "dQw4w9WgXcQ"
         
     gms_key = os.environ.get('GMS_KEY', '')
-    gms_endpoint = os.environ.get('GMS_ENDPOINT', 'https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent')
+    gms_endpoint = os.environ.get('GMS_ENDPOINT', 'https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions')
     summary = "AI 요약 기능을 사용할 수 없습니다. (API KEY 누락)"
     if gms_key:
-        prompt = f"보드게임 '{title}'의 핵심 승리 조건과 턴 진행 방식을 초보자에게 설명하듯이 친절하고 친근하게 3~4줄로 요약해줘. 이모지도 써서 귀엽게 설명해줘."
-        url = f"{gms_endpoint}?key={gms_key}"
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        headers = {"Content-Type": "application/json"}
-        
+        prompt = f"보드게임 '{title}'에 대해 초보자에게 승리 조건과 턴 진행 방식을 이모지를 섞어서 아주 짧게 2~3줄로 요약해줘."
+        url = gms_endpoint
+        payload = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}]}
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {gms_key}"
+        }
         try:
-            res = requests.post(url, json=payload, headers=headers, timeout=60)
+            res = requests.post(url, json=payload, headers=headers, timeout=30)
             res.raise_for_status()
             data = res.json()
-            summary = data['candidates'][0]['content']['parts'][0]['text']
+            summary = data['choices'][0]['message']['content'].strip()
         except Exception as e:
             summary = f"AI 호출 중 오류가 발생했습니다: {str(e)}"
-            print("Gemini API Error:", e)
+            print("GMS Error:", e)
             
     return JsonResponse({
         'youtube_videoId': video_id,

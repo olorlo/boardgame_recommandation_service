@@ -21,22 +21,18 @@
 
   <main class="container">
     <section v-if="view === 'main'">
-      <div style="margin-bottom: 3rem;">
+      <div style="margin-bottom: 3rem; position: relative;">
         <i class="fa-solid fa-dice" style="font-size: 3rem; color: #a491bc;"></i>
         <h1>뭐할게임?</h1>
         <p class="subtitle">5명이서 할 건 없다고? 여기 있음</p>
+        <div style="margin-top: 10px; font-size: 0.8rem; color: #999;">※ 버그는 컨셉입니다.</div>
       </div>
 
-      <div class="hero-actions">
-        <button class="btn btn-yellow" @click="showRecommend">
-          <i class="fa-solid fa-dice-d20"></i> 게임 추천받기
+      <div class="hero-actions" style="position: relative; display: inline-block;">
+        <button class="btn btn-yellow" @click="showRecommend" style="position: relative; z-index: 2;">
+          <i class="fa-solid fa-dice-d20"></i> 오늘도 게임 못 정함? 추천받기
         </button>
-        <button class="btn btn-red" @click="openToolModal('penalty')">
-          <i class="fa-solid fa-skull"></i> 벌칙 원판
-        </button>
-        <button class="btn btn-brown" @click="openToolModal('turn')">
-          <i class="fa-solid fa-route"></i> 사다리 순서
-        </button>
+        <div style="position: absolute; top: -15px; right: -15px; transform: rotate(15deg); background-color: yellow; color: red; font-weight: bold; font-size: 0.75rem; padding: 2px 5px; border: 1px solid red; z-index: 3; box-shadow: 2px 2px 0 rgba(0,0,0,0.2);">※ 친구 관계 파괴 주의</div>
       </div>
     </section>
 
@@ -107,8 +103,24 @@
   </main>
 
   <div v-if="toolModal" class="modal-overlay" @click.self="closeToolModal">
-    <div class="modal-content tool-modal">
-      <button class="modal-close" type="button" @click="closeToolModal">&times;</button>
+    <div class="modal-content retro-window" style="padding: 3px;">
+      <div class="retro-titlebar">
+        <span id="retroModalTitle">
+          <i v-if="toolModal === 'penalty'" class="fa-solid fa-skull"></i>
+          <i v-else class="fa-solid fa-users"></i>
+          {{ toolModal === 'penalty' ? '벌칙_프로그램.exe' : '순서_추첨기.exe' }}
+        </span>
+        <div class="retro-titlebar-close" @click="closeToolModal">X</div>
+      </div>
+      <div class="retro-content-inner">
+        <div class="tool-tabs" style="margin-bottom:20px; text-align: left; display: block; border-bottom: none;">
+          <button class="tool-tab" :style="toolModal === 'penalty' ? 'background: var(--primary-color); color: white; border: 2px inset #eadecc;' : 'background: #eadecc; color: var(--text-dark); border: 2px outset #fff;'" style="width:auto; padding:0.4rem 0.8rem; box-shadow:none; font-size:0.9rem; border-radius: 0; margin-right: 5px; cursor: pointer;" @click="openToolModal('penalty')">
+            벌칙 뽑기
+          </button>
+          <button class="tool-tab" :style="toolModal === 'turn' ? 'background: var(--primary-color); color: white; border: 2px inset #eadecc;' : 'background: #eadecc; color: var(--text-dark); border: 2px outset #fff;'" style="width:auto; padding:0.4rem 0.8rem; box-shadow:none; font-size:0.9rem; border-radius: 0; cursor: pointer;" @click="openToolModal('turn')">
+            순서 정하기
+          </button>
+        </div>
 
       <template v-if="toolModal === 'penalty'">
         <h2 class="tool-title">벌칙 원판</h2>
@@ -263,7 +275,29 @@
 
         <div v-if="ladderResult" class="turn-result-text">{{ ladderResult }} 선턴!</div>
       </template>
+        <div style="margin-top: 15px; font-size: 0.75rem; color: var(--text-light); text-align: right;">※ 클릭은 자유, 결과는 책임 안 짐</div>
+      </div>
     </div>
+  </div>
+
+  <!-- B-grade Retro Ads (Bottom Right) -->
+  <div style="position: fixed; bottom: 20px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 15px; pointer-events: none;">
+      <!-- Ad 1: Penalty -->
+      <div class="b-grade-ad" style="border: 3px outset #eadecc;" @click="openToolModal('penalty')">
+          <div style="background: #fff; border: 2px inset #eadecc; padding: 10px 5px;">
+              <div style="color: red; font-size: 0.75rem; font-weight: bold; margin-bottom: 4px; animation: blink 1s infinite;">[ 경 고 ]</div>
+              <div style="color: var(--primary-color); font-size: 0.9rem; font-weight: 900; margin-bottom: 10px; line-height: 1.3;">☠ 벌칙 안 뽑고<br>도망갈거임?</div>
+              <button style="background: var(--accent-color); color: white; border: 2px outset #eadecc; font-size: 0.85rem; font-weight: bold; width: 100%; padding: 4px 0; cursor: pointer; box-shadow: none;">벌칙 룰렛 ➔</button>
+          </div>
+      </div>
+
+      <!-- Ad 2: Turn -->
+      <div class="b-grade-ad" style="border: 3px dashed var(--secondary-color);" @click="openToolModal('turn')">
+          <div style="background: #fff; padding: 8px 5px; border: 1px solid var(--secondary-color);">
+              <div style="color: var(--primary-color); font-size: 0.9rem; font-weight: 900; margin-bottom: 10px; line-height: 1.3;">🪜 순서 정하고<br>보드게임하자!</div>
+              <button style="background: var(--secondary-color); color: #fff; border: 2px outset #eadecc; font-size: 0.85rem; font-weight: bold; width: 100%; padding: 4px 0; cursor: pointer; box-shadow: none;">순서 정하기 ➔</button>
+          </div>
+      </div>
   </div>
 
   <div v-if="gameModal.open" class="modal-overlay" @click.self="closeGameDetail">
@@ -304,6 +338,17 @@
             </div>
           </div>
         </div>
+
+        <div class="community-share-box" style="margin-top: 20px; padding: 15px; background: var(--box-bg); border-radius: 8px;">
+          <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--primary-color);">낙서장에 공유하기</h4>
+          <textarea v-model="gameModal.shareContent" class="input-field" placeholder="이 게임 어땠나요? 추천받은 소감이나 리뷰를 남겨보세요!" style="width: 100%; min-height: 80px; resize: vertical; margin-bottom: 10px;"></textarea>
+          <div style="text-align: right;">
+             <button class="btn btn-yellow" style="margin: 0; width: auto; font-size: 0.9rem; padding: 0.5rem 1rem;" @click="shareToCommunity" :disabled="gameModal.shareLoading">
+               <i class="fa-solid fa-paper-plane"></i> {{ gameModal.shareLoading ? '공유 중...' : '낙서장에 등록' }}
+             </button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -344,7 +389,9 @@ const gameModal = reactive({
   title: '',
   details: null,
   summary: '',
-  youtubeVideoId: ''
+  youtubeVideoId: '',
+  shareContent: '',
+  shareLoading: false
 })
 
 const wheelColors = ['#c45b4c', '#e0ac5f', '#5d3f2e', '#6e9f84', '#6f88b8', '#a491bc', '#d7837f']
@@ -446,7 +493,10 @@ async function getAIRecommend() {
   try {
     const response = await fetch('/boardgames/recommend/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken') || ''
+      },
       body: JSON.stringify({ situation: situation.value })
     })
     const data = await response.json()
@@ -745,6 +795,61 @@ async function openAiRecommendModal(title) {
   }
 }
 
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+async function shareToCommunity() {
+  if (!gameModal.shareContent.trim()) {
+    alert('내용을 입력해주세요.');
+    return;
+  }
+  gameModal.shareLoading = true;
+  try {
+    let cleanTitle = gameModal.title.replace(' (AI 추천)', '').trim();
+    const response = await fetch('/community/api/create/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken') || ''
+      },
+      body: JSON.stringify({
+        content: gameModal.shareContent,
+        game_title: cleanTitle
+      })
+    });
+    
+    if (response.status === 401) {
+       alert('로그인이 필요합니다. 로그인 페이지로 이동합니다.');
+       window.location.href = '/accounts/login/';
+       return;
+    }
+    
+    const data = await response.json();
+    if (data.status === 'success') {
+      alert('낙서장에 성공적으로 공유되었습니다!');
+      gameModal.shareContent = '';
+    } else {
+      alert(data.message || '공유에 실패했습니다.');
+    }
+  } catch (err) {
+    alert('오류가 발생했습니다: ' + err.message);
+  } finally {
+    gameModal.shareLoading = false;
+  }
+}
+
 function closeGameDetail() {
   gameModal.open = false
 }
@@ -755,5 +860,7 @@ function resetGameModal(title) {
   gameModal.details = null
   gameModal.summary = ''
   gameModal.youtubeVideoId = ''
+  gameModal.shareContent = ''
+  gameModal.shareLoading = false
 }
 </script>

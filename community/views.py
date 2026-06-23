@@ -7,6 +7,7 @@ from .models import Article, Comment
 
 def index(request):
     query = request.GET.get('q', '').strip()
+    tag_filter = request.GET.get('tag', '').strip()
     articles = Article.objects.all().order_by('-created_at')
     
     if query:
@@ -14,11 +15,15 @@ def index(request):
             Q(content__icontains=query) | Q(user__username__icontains=query)
         )
         
-    articles = articles.prefetch_related('comments__user', 'user', 'like_users')
+    if tag_filter:
+        articles = articles.filter(tags__name=tag_filter)
+        
+    articles = articles.prefetch_related('comments__user', 'user', 'like_users', 'tags').distinct()
     
     context = {
         'articles': articles,
         'query': query,
+        'tag_filter': tag_filter,
     }
     return render(request, 'community/index.html', context)
 
@@ -95,3 +100,27 @@ def delete(request, article_pk):
         article.delete()
     return redirect('community:index')
 
+@require_POST
+def api_create(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'status': 'error', 'message': '로그인이 필요합니다.'}, status=401)
+        
+    import json
+    try:
+        data = json.loads(request.body)
+        content = data.get('content', '').strip()
+        game_title = data.get('game_title', '').strip()
+        
+        if not content:
+            return JsonResponse({'status': 'error', 'message': '내용을 입력해주세요.'}, status=400)
+            
+        article = Article.objects.create(user=request.user, content=content)
+        
+        if game_title:
+            from .models import Tag
+            tag, _ = Tag.objects.get_or_create(name=game_title)
+            article.tags.add(tag)
+            
+        return JsonResponse({'status': 'success', 'article_id': article.pk})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
