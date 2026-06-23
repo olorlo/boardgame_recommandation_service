@@ -81,22 +81,25 @@ def recommend_game(request, game_id):
             video_id = "dQw4w9WgXcQ"
             
         gms_key = os.environ.get('GMS_KEY', '')
-        gms_endpoint = os.environ.get('GMS_ENDPOINT', 'https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent')
+        gms_endpoint = os.environ.get('GMS_ENDPOINT', 'https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions')
         summary = "AI 요약 기능을 사용할 수 없습니다. (API KEY 누락)"
         if gms_key:
             prompt = f"보드게임 '{game.title}'의 핵심 승리 조건과 턴 진행 방식을 3~4줄로 요약해줘."
-            url = f"{gms_endpoint}?key={gms_key}"
-            payload = {"contents": [{"parts": [{"text": prompt}]}]}
-            headers = {"Content-Type": "application/json"}
+            url = gms_endpoint
+            payload = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}]}
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {gms_key}"
+            }
             
             try:
-                res = requests.post(url, json=payload, headers=headers, timeout=60)
+                res = requests.post(url, json=payload, headers=headers, timeout=30)
                 res.raise_for_status()
                 data = res.json()
-                summary = data['candidates'][0]['content']['parts'][0]['text']
+                summary = data['choices'][0]['message']['content'].strip()
             except Exception as e:
                 summary = f"AI 호출 중 오류가 발생했습니다: {str(e)}"
-                print("Gemini API Error:", res.text if 'res' in locals() else e)
+                print("GMS API Error:", e)
             
         return JsonResponse({
             'youtube_videoId': video_id,
@@ -235,6 +238,18 @@ def details_by_title(request):
     else:
         video_id = "dQw4w9WgXcQ"
         
+    details_data = None
+    try:
+        from .models import BoardGames, GameDetails
+        game = BoardGames.objects.filter(title=title).first()
+        if game:
+            details = GameDetails.objects.filter(boardgame=game).first()
+            if details:
+                from .serializers import GameDetailsSerializer
+                details_data = GameDetailsSerializer(details).data
+    except Exception as e:
+        print("Details Fetch Error:", e)
+        
     gms_key = os.environ.get('GMS_KEY', '')
     gms_endpoint = os.environ.get('GMS_ENDPOINT', 'https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions')
     summary = "AI 요약 기능을 사용할 수 없습니다. (API KEY 누락)"
@@ -257,7 +272,8 @@ def details_by_title(request):
             
     return JsonResponse({
         'youtube_videoId': video_id,
-        'ai_summary': summary
+        'ai_summary': summary,
+        'details': details_data
     })
 
 # --- Existing API Views ---

@@ -4,8 +4,8 @@
       <i class="fa-solid fa-dice"></i> 뭐할게임?
     </a>
     <div class="navbar-links">
-      <a href="#" :class="{ active: view === 'main' || view === 'recommend' }" @click.prevent="showRecommend">
-        <i class="fa-solid fa-link"></i> 추천
+      <a href="#" :class="{ active: view !== 'main' }" @click.prevent="showMain">
+        <i class="fa-solid fa-home"></i> 메인
       </a>
       <button type="button" :class="{ active: toolModal === 'penalty' }" @click="openToolModal('penalty')">
         <i class="fa-solid fa-circle-exclamation"></i> 벌칙
@@ -36,81 +36,140 @@
         <div style="margin-top: 10px; font-size: 0.8rem; color: #999;">※ 버그는 컨셉입니다.</div>
       </div>
 
-      <div class="hero-actions" style="position: relative; display: inline-block;">
-        <button class="btn btn-yellow" @click="showRecommend" style="position: relative; z-index: 2;">
-          <i class="fa-solid fa-dice-d20"></i> 오늘도 게임 못 정함? 추천받기
+      <div class="hero-actions" style="position: relative; display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+        <button class="btn btn-yellow" @click="showAiRecommend" style="padding: 1.5rem 2rem; font-size: 1.2rem; width: 100%; max-width: 400px;">
+          <i class="fa-solid fa-robot"></i> AI 상황 맞춤 추천
         </button>
-        <div style="position: absolute; top: -15px; right: -15px; transform: rotate(15deg); background-color: yellow; color: red; font-weight: bold; font-size: 0.75rem; padding: 2px 5px; border: 1px solid red; z-index: 3; box-shadow: 2px 2px 0 rgba(0,0,0,0.2);">※ 친구 관계 파괴 주의</div>
+        
+        <button class="btn btn-blue" @click="showFilterSearch" style="padding: 1.5rem 2rem; font-size: 1.2rem; width: 100%; max-width: 400px;">
+          <i class="fa-solid fa-filter"></i> 조건 필터로 직접 찾기
+        </button>
       </div>
     </section>
 
-    <section v-else>
-      <div style="margin-bottom: 2rem;">
-        <h2 style="color: var(--primary-color);">오늘 뭐하지?</h2>
-        <p class="subtitle">상황이나 조건으로 골라보기</p>
+    <section v-else-if="view === 'ai_recommend'">
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 2px solid var(--box-bg); padding-bottom: 0.8rem; margin-bottom: 1.5rem;">
+        <div style="display: flex; align-items: baseline; gap: 12px;">
+          <h2 style="font-size: 1.8rem; color: var(--primary-color); margin: 0;">
+            <i class="fa-solid fa-robot" style="color: var(--secondary-color);"></i> AI 맞춤 추천
+          </h2>
+          <span style="color: var(--text-light); font-size: 0.95rem;">상황을 알려주시면 가장 완벽한 게임을 찾아드려요</span>
+        </div>
+        <button @click="showMain" style="background: none; border: none; font-size: 1rem; color: var(--text-light); cursor: pointer; padding: 0; display: flex; align-items: center; gap: 5px;">
+          <i class="fa-solid fa-arrow-left"></i> 메인으로
+        </button>
       </div>
 
-      <div class="panels">
-        <div class="card panel">
-          <h3>상황 맞춤 AI 추천</h3>
-          <div class="ai-row">
-            <input
+      <div style="display: grid; grid-template-columns: 320px 1fr; gap: 2rem; align-items: start;">
+        <!-- Left: AI Input -->
+        <div class="card panel" style="position: sticky; top: 2rem; aspect-ratio: 1 / 1; display: flex; flex-direction: column;">
+          <h3 style="margin-top: 0; margin-bottom: 15px;">상황을 알려주세요</h3>
+          <div style="display: flex; flex-direction: column; gap: 10px; flex-grow: 1;">
+            <textarea
               v-model="situation"
-              type="text"
               class="input-field"
-              placeholder="예: 초보자 4명이서 1시간 안에 끝나는 파티 게임"
-              style="margin-bottom: 0;"
-              @keyup.enter="getAIRecommend"
-            />
-            <button class="btn btn-brown" style="margin: 0; width: 80px; padding: 0;" @click="getAIRecommend">
-              추천
+              placeholder="예: 초보자 4명이서 1시간 안에 끝나는 파티 게임&#10;&#10;(Enter로 바로 검색, Shift+Enter로 줄바꿈)"
+              style="flex-grow: 1; resize: none; margin-bottom: 0; border-radius: 8px;"
+              @keydown.enter.exact.prevent="getAIRecommend"
+            ></textarea>
+            <button class="btn btn-brown" style="width: 100%; padding: 1rem; margin-top: 10px; font-size: 1.1rem;" @click="getAIRecommend" :disabled="aiLoading">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> AI에게 추천받기
             </button>
+            <div v-if="aiLoading" style="text-align: center; margin-top: 10px; color: var(--primary-color);">
+              <i class="fa-solid fa-spinner fa-spin"></i> AI가 고민 중...
+            </div>
           </div>
-          <div v-if="aiLoading" style="text-align: center; margin-top: 10px;">
-            <i class="fa-solid fa-spinner fa-spin"></i> AI가 고민 중...
+        </div>
+
+        <!-- Right: Recommendations -->
+        <div>
+          <div v-if="!aiLoading && aiRecommendations.length === 0" style="text-align: center; padding: 3rem; background: var(--box-bg); border-radius: 8px; border: 2px dashed #ccc;">
+            <i class="fa-solid fa-robot" style="font-size: 3rem; color: #ccc; margin-bottom: 1rem;"></i>
+            <p style="color: #666; font-size: 1.1rem; margin: 0;">어떤 상황인지 입력하고 Enter를 누르면<br>딱 맞는 게임을 추천해 드려요!</p>
           </div>
-          <div style="margin-top: 20px;">
-            <div v-for="item in aiRecommendations" :key="item.title" class="ai-item" @click="openAiRecommendModal(item.title)">
-              <div class="ai-item-content" style="display: flex; gap: 15px; align-items: center;">
+          <div v-else style="display: flex; flex-direction: column; gap: 15px;">
+            <div v-for="item in aiRecommendations" :key="item.title" class="card ai-item" @click="openAiRecommendModal(item.title)" style="margin: 0;">
+              <div class="ai-item-content" style="display: flex; gap: 15px; align-items: flex-start;">
                 <img v-if="item.image_url" :src="item.image_url" alt="board game cover" class="ai-item-image" />
                 <div class="ai-item-text" style="text-align: left;">
-                  <strong style="color: var(--primary-color); text-decoration: underline;">{{ item.title }}</strong><br />
-                  <span style="font-size: 0.9rem; color: var(--text-light);">{{ item.reason }}</span>
+                  <strong style="color: var(--primary-color); text-decoration: underline; font-size: 1.1rem;">{{ item.title }}</strong><br />
+                  <span style="font-size: 0.95rem; color: var(--text-dark); display: inline-block; margin-top: 5px;">{{ item.reason }}</span>
                 </div>
               </div>
             </div>
-            <p v-if="aiError" style="color: red;">오류: {{ aiError }}</p>
-          </div>
-        </div>
-
-        <div class="card panel">
-          <h3>조건 필터로 찾기</h3>
-          <div class="filter-row">
-            <input v-model="filters.players" type="number" placeholder="인원(명)" class="input-field" @change="fetchFilteredGames" @keyup.enter="fetchFilteredGames" />
-            <input v-model="filters.time" type="number" placeholder="시간(분 이하)" class="input-field" @change="fetchFilteredGames" @keyup.enter="fetchFilteredGames" />
-            <select v-model="filters.difficulty" class="input-field" @change="fetchFilteredGames">
-              <option value="">난이도 전체</option>
-              <option value="easy">쉬움</option>
-              <option value="medium">보통</option>
-              <option value="hard">어려움</option>
-            </select>
-          </div>
-          <div v-if="filterLoading" style="text-align: center;">
-            <i class="fa-solid fa-spinner fa-spin"></i> 검색 중...
+            <p v-if="aiError" style="color: red; text-align: center;">오류: {{ aiError }}</p>
           </div>
         </div>
       </div>
+    </section>
 
-      <div class="games-grid">
-        <div v-for="game in games" :key="game.game_id" class="card game-card" @click="openGameModal(game.game_id, game.title)">
-          <h4>{{ game.title }}</h4>
-          <p>순위: {{ game.rank }}</p>
-          <p>출시: {{ game.released_year }}</p>
+    <section v-else-if="view === 'filter_search'">
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 2px solid var(--box-bg); padding-bottom: 0.8rem; margin-bottom: 1.5rem;">
+        <div style="display: flex; align-items: baseline; gap: 12px;">
+          <h2 style="font-size: 1.8rem; color: var(--primary-color); margin: 0;">
+            <i class="fa-solid fa-filter" style="color: var(--secondary-color);"></i> 조건 필터 검색
+          </h2>
+          <span style="color: var(--text-light); font-size: 0.95rem;">인원, 시간, 난이도를 직접 지정해서 검색해보세요</span>
         </div>
+        <button @click="showMain" style="background: none; border: none; font-size: 1rem; color: var(--text-light); cursor: pointer; padding: 0; display: flex; align-items: center; gap: 5px;">
+          <i class="fa-solid fa-arrow-left"></i> 메인으로
+        </button>
       </div>
 
-      <div style="margin-top: 2rem;">
-        <button class="btn btn-outline" @click="showMain">메인으로 돌아가기</button>
+      <div style="display: grid; grid-template-columns: 280px 1fr; gap: 2rem; align-items: start;">
+        <!-- Left: Filters -->
+        <div class="card panel" style="position: sticky; top: 2rem; aspect-ratio: 1 / 1; display: flex; flex-direction: column;">
+          <h3 style="margin-top: 0; margin-bottom: 15px;">조건 필터</h3>
+          <div style="display: flex; flex-direction: column; gap: 12px; flex-grow: 1;">
+            <div>
+              <label style="font-size: 0.9rem; color: var(--text-light); font-weight: bold;">인원(명)</label>
+              <input v-model="filters.players" type="number" placeholder="예: 4" class="input-field" @keyup.enter="fetchFilteredGames" style="margin-bottom: 0;" />
+            </div>
+            <div>
+              <label style="font-size: 0.9rem; color: var(--text-light); font-weight: bold;">시간(분 이하)</label>
+              <input v-model="filters.time" type="number" placeholder="예: 60" class="input-field" @keyup.enter="fetchFilteredGames" style="margin-bottom: 0;" />
+            </div>
+            <div>
+              <label style="font-size: 0.9rem; color: var(--text-light); font-weight: bold;">난이도</label>
+              <select v-model="filters.difficulty" class="input-field" style="margin-bottom: 0;">
+                <option value="">전체</option>
+                <option value="easy">쉬움</option>
+                <option value="medium">보통</option>
+                <option value="hard">어려움</option>
+              </select>
+            </div>
+            <div style="flex-grow: 1;"></div>
+            <button class="btn btn-brown" style="margin-top: auto; width: 100%; padding: 0.8rem; font-size: 1rem;" @click="fetchFilteredGames" :disabled="filterLoading">
+              <i class="fa-solid" :class="filterLoading ? 'fa-spinner fa-spin' : 'fa-search'"></i> 검색하기
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Results Table -->
+        <div>
+          <div v-if="!filterLoading && games.length === 0" style="text-align: center; padding: 3rem; background: var(--box-bg); border-radius: 8px; border: 2px dashed #ccc;">
+            <i class="fa-solid fa-ghost" style="font-size: 3rem; color: #ccc; margin-bottom: 1rem;"></i>
+            <p style="color: #666; font-size: 1.1rem; margin: 0;">조건에 맞는 게임이 없어요 😢<br>조건을 조금 바꿔보세요!</p>
+          </div>
+          <div v-else-if="games.length > 0" class="card" style="padding: 0; overflow: hidden;">
+            <table class="games-table">
+              <thead>
+                <tr>
+                  <th style="width: 80px; text-align: center;">순위</th>
+                  <th>게임명</th>
+                  <th style="width: 100px; text-align: center;">출시연도</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="game in games" :key="game.game_id" @click="openGameModal(game.game_id, game.title)">
+                  <td style="text-align: center; font-weight: bold; color: var(--primary-color);">{{ game.rank }}</td>
+                  <td>{{ game.title }}</td>
+                  <td style="text-align: center; color: var(--text-light);">{{ game.released_year }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -478,8 +537,12 @@ function showMain() {
   view.value = 'main'
 }
 
-function showRecommend() {
-  view.value = 'recommend'
+function showAiRecommend() {
+  view.value = 'ai_recommend'
+}
+
+function showFilterSearch() {
+  view.value = 'filter_search'
   if (!games.value.length) fetchFilteredGames()
 }
 
@@ -840,6 +903,7 @@ async function openAiRecommendModal(title) {
   try {
     const response = await fetch(`/boardgames/api/details_by_title/?title=${encodeURIComponent(title)}`)
     const data = await response.json()
+    gameModal.details = data.details || null
     gameModal.summary = data.ai_summary || ''
     gameModal.youtubeVideoId = data.youtube_videoId || ''
   } finally {
