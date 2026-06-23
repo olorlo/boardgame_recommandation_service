@@ -116,13 +116,43 @@ def situation_recommend(request):
         if not gms_key:
             return JsonResponse({'error': 'GMS_KEY is not set.'}, status=500)
             
-        # DB에 있는 게임 목록 가져오기 (토큰 수 제한을 고려하여 인기 순 최대 300개로 제한)
-        db_games = list(BoardGames.objects.order_by('rank').values_list('title', flat=True)[:300])
-        game_list_str = ", ".join(db_games) if db_games else "(현재 DB에 게임이 없습니다)"
+        import random
+        # DB에 있는 게임 목록 가져오기: RAG 다양성을 위해 상위 1000개 중 랜덤 150개 추출 (스펙 포함)
+        all_ids = list(GameDetails.objects.filter(boardgame__rank__lte=1000).values_list('id', flat=True))
+        if all_ids:
+            selected_ids = random.sample(all_ids, min(150, len(all_ids)))
+            details = GameDetails.objects.filter(id__in=selected_ids).select_related('boardgame')
+        else:
+            details = []
+            
+        game_list_lines = []
+        for d in details:
+            game_list_lines.append(f"- {d.boardgame.title} (인원: {d.min_players}~{d.max_players}인, 시간: {d.playing_time}분, 난이도: {d.weight}/5.0)")
+            
+        game_list_str = "\n".join(game_list_lines) if game_list_lines else "(현재 DB에 게임 정보가 없습니다)"
         
-        prompt = f"다음은 우리 데이터베이스에 있는 보드게임 목록입니다: {game_list_str}\n\n이 목록에 있는 게임들 중에서만, 다음 상황에 맞는 보드게임 3개를 골라 추천해주고 이유를 짧게 설명해줘. 상황: {situation}. 인사말이나 부연 설명 없이 오직 JSON 배열만 출력해줘. 포맷: [{{\"title\": \"...\", \"reason\": \"...\"}}]"
+        system_prompt = """당신은 방구석에서 10년 동안 보드게임만 연구한, 통찰력 있는 B급 감성의 보드게임 오타쿠 전문가입니다.
+사용자가 입력한 상황(인원수, 시간 등)과 제공된 [데이터베이스 목록]의 게임 스펙(인원, 시간, 난이도)을 꼼꼼히 대조하여, 조건에 완벽히 부합하는 게임 딱 3개만 고르세요.
+추천 이유는 존댓말을 유지하되, 매우 유쾌하고 친근하며 재치 있는 말투로 작성해주세요. (예: "친구분들끼리 이거 하다가 우정 파괴되기 딱 좋습니다 ㅎㅎ", "초보자분들도 금방 적응하실 수 있는 갓겜이랍니다!")
+인사말이나 부연 설명은 절대 하지 말고, 오직 지정된 JSON 배열 포맷만 출력하세요."""
+
+        user_prompt = f"""[우리 데이터베이스 목록 (스펙 포함)]
+{game_list_str}
+
+[상황]
+{situation}
+
+위 상황에 맞는 보드게임 3개를 추천해주세요. 
+포맷: [{{"title": "...", "reason": "..."}}]"""
+
         url = gms_endpoint
-        payload = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}]}
+        payload = {
+            "model": "gpt-4o-mini", 
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+        }
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {gms_key}"
@@ -142,6 +172,43 @@ def situation_recommend(request):
             text = text.replace("```json", "").replace("```", "").strip()
             
         result = json.loads(text)
+        
+        import xml.etree.ElementTree as ET
+        
+        fallback_image = "/boardgame_fallback.png"
+        youtube_api_key = os.environ.get('YOUTUBE_API_KEY', '')
+        bgg_key = os.environ.get('BGG_KEY', '')
+        
+        for item in result:
+            title = item.get("title", "")
+            item["image_url"] = fallback_image
+            
+            # DB에서 title로 game_id 검색
+            game = BoardGames.objects.filter(title=title).first()
+            if game:
+                # 1순위: BGG API 시도
+                try:
+                    bgg_url = f"https://boardgamegeek.com/xmlapi2/thing?id={game.game_id}"
+                    bgg_headers = {'Authorization': f'Bearer {bgg_key}'} if bgg_key else {}
+                    bgg_res = requests.get(bgg_url, headers=bgg_headers, timeout=3)
+                    if bgg_res.status_code == 200:
+                        root = ET.fromstring(bgg_res.content)
+                        thumb = root.find(".//thumbnail")
+                        if thumb is not None and thumb.text:
+                            item["image_url"] = thumb.text
+                except Exception:
+                    pass
+                
+                # 2순위: BGG 실패 시 YouTube 썸네일 시도
+                if item["image_url"] == fallback_image and youtube_api_key:
+                    try:
+                        youtube = build('youtube', 'v3', developerKey=youtube_api_key)
+                        req = youtube.search().list(q=f"{title} 보드게임", part="snippet", type="video", maxResults=1)
+                        yt_res = req.execute()
+                        if yt_res['items']:
+                            item["image_url"] = yt_res['items'][0]['snippet']['thumbnails']['high']['url']
+                    except Exception as e:
+                        print(f"YouTube Thumbnail Error for {title}: {e}")
         
         return JsonResponse({'recommendations': result})
     except Exception as e:

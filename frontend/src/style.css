@@ -752,3 +752,5 @@ h1 {
 .b-grade-ad:hover {
   transform: scale(1.05);
 }
+
+.ai-item-image { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 2px outset #eadecc; box-shadow: 2px 2px 0 rgba(0,0,0,0.1); flex-shrink: 0; }

@@ -71,8 +71,13 @@
           </div>
           <div style="margin-top: 20px;">
             <div v-for="item in aiRecommendations" :key="item.title" class="ai-item" @click="openAiRecommendModal(item.title)">
-              <strong style="color: var(--primary-color); text-decoration: underline;">{{ item.title }}</strong><br />
-              <span style="font-size: 0.9rem; color: var(--text-light);">{{ item.reason }}</span>
+              <div class="ai-item-content" style="display: flex; gap: 15px; align-items: center;">
+                <img v-if="item.image_url" :src="item.image_url" alt="board game cover" class="ai-item-image" />
+                <div class="ai-item-text" style="text-align: left;">
+                  <strong style="color: var(--primary-color); text-decoration: underline;">{{ item.title }}</strong><br />
+                  <span style="font-size: 0.9rem; color: var(--text-light);">{{ item.reason }}</span>
+                </div>
+              </div>
             </div>
             <p v-if="aiError" style="color: red;">오류: {{ aiError }}</p>
           </div>
