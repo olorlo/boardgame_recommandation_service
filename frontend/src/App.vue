@@ -64,40 +64,42 @@
             <div style="margin-top: 10px; font-size: 0.8rem; color: #999;">※ 버그는 컨셉입니다.</div>
           </div>
 
-      <div class="hero-actions" style="display: flex; justify-content: center; margin-bottom: 3rem;">
-        <button class="btn btn-yellow" @click="openRecommendInputModal" style="padding: 1.5rem 3rem; font-size: 1.5rem; border-radius: 12px; box-shadow: 0 6px 0 #c28c40; width: 100%; max-width: 400px; animation: pulse 2s infinite;">
-          <i class="fa-solid fa-wand-magic-sparkles"></i> 보드게임 추천받기
-        </button>
-      </div>
+          <div class="hero-actions" style="display: flex; justify-content: center; margin-bottom: 3rem;">
+            <button class="btn btn-yellow" @click="openRecommendInputModal" style="padding: 1.5rem 3rem; font-size: 1.5rem; border-radius: 12px; box-shadow: 0 6px 0 #c28c40; width: 100%; max-width: 400px; animation: pulse 2s infinite;">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> 보드게임 추천받기
+            </button>
+          </div>
 
       <!-- Trending Section -->
-      <div class="trending-section" style="max-width: 800px; margin: 0 auto; text-align: left;">
-        <h3 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; margin-bottom: 15px;">
-          <i class="fa-solid fa-fire" style="color: red;"></i> 실시간 많이 찾는 보드게임
-        </h3>
-        
-        <div v-if="trendingLoading" style="text-align: center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> 불러오는 중...</div>
-        <div v-else class="card" style="padding: 0; overflow: hidden;">
-          <table class="games-table" style="margin: 0;">
-            <tbody>
-              <tr v-for="game in visibleTrendingGames" :key="game.game_id + '-' + game.rank" @click="openGameModal(game.game_id, game.title)">
-                <td style="width: 50px; text-align: center; font-weight: bold; font-size: 1.1rem;" :style="{ color: game.rank <= 3 ? 'red' : 'var(--text-light)' }">{{ game.rank }}</td>
-                <td style="font-weight: bold; position: relative;">
-                  <transition name="ticker-slide" mode="out-in">
-                    <div :key="game.game_id" style="display: flex; align-items: center; gap: 8px; width: 100%;">
-                      <span>{{ game.title }}</span>
-                      <span style="font-size: 0.85rem; color: var(--text-light); font-weight: normal;">
-                        <i class="fa-regular fa-eye"></i> {{ game.view_count || 0 }}
-                      </span>
-                    </div>
-                  </transition>
-                </td>
-                <td style="width: 50px; text-align: right; color: var(--text-light); padding-right: 20px; cursor: pointer;" @click.stop="showAllTrending = !showAllTrending">
-                  <i v-if="!showAllTrending || game.rank === 1" class="fa-solid" :class="showAllTrending ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="trending-section" style="max-width: 800px; margin: 0 auto; text-align: left;">
+            <h3 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; margin-bottom: 15px;">
+              <i class="fa-solid fa-fire" style="color: red;"></i> 실시간 많이 찾는 보드게임
+            </h3>
+
+            <div v-if="trendingLoading" style="text-align: center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> 불러오는 중...</div>
+            <div v-else class="card" style="padding: 0; overflow: hidden;">
+              <table class="games-table" style="margin: 0;">
+                <tbody>
+                  <tr v-for="game in visibleTrendingGames" :key="game.game_id + '-' + game.rank" @click="openGameModal(game.game_id, game.title)">
+                    <td style="width: 50px; text-align: center; font-weight: bold; font-size: 1.1rem;" :style="{ color: game.rank <= 3 ? 'red' : 'var(--text-light)' }">{{ game.rank }}</td>
+                    <td style="font-weight: bold; position: relative;">
+                      <transition name="ticker-slide" mode="out-in">
+                        <div :key="game.game_id" style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                          <span>{{ game.title }}</span>
+                          <span style="font-size: 0.85rem; color: var(--text-light); font-weight: normal;">
+                            <i class="fa-regular fa-eye"></i> {{ game.view_count || 0 }}
+                          </span>
+                        </div>
+                      </transition>
+                    </td>
+                    <td style="width: 50px; text-align: right; color: var(--text-light); padding-right: 20px; cursor: pointer;" @click.stop="showAllTrending = !showAllTrending">
+                      <i v-if="!showAllTrending || game.rank === 1" class="fa-solid" :class="showAllTrending ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -176,7 +178,7 @@
       
       <!-- Step 2: Results -->
       <template v-else-if="recommendModal.step === 2">
-       <div v-else style="display: flex; flex-direction: column; gap: 15px;">
+        <div style="display: flex; flex-direction: column; gap: 15px;">
             <div class="recommend-result-actions">
               <div>
                 <strong>추천 결과</strong>
@@ -197,6 +199,7 @@
               </div>
             </div>
             <p v-if="aiError" style="color: red; text-align: center;">오류: {{ aiError }}</p>
+        </div>
       </template>
     </div>
   </div>
