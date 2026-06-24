@@ -7,6 +7,14 @@ class BoardGames(models.Model):
     rank = models.IntegerField()
     released_year = models.IntegerField()
     view_count = models.IntegerField(default=0)
+    party_rank = models.IntegerField(null=True, blank=True)
+    family_rank = models.IntegerField(null=True, blank=True)
+    thumbnail_url = models.URLField(blank=True)
+    image_url = models.URLField(blank=True)
+    korean_title = models.CharField(max_length=200, blank=True)
+    boardlife_rank = models.IntegerField(null=True, blank=True)
+    boardlife_game_id = models.IntegerField(null=True, blank=True)
+    boardlife_url = models.URLField(blank=True)
 
 class GameDetails(models.Model):
     boardgame = models.ForeignKey(BoardGames, on_delete=models.CASCADE, related_name='details')

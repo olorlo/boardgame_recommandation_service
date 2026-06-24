@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import requests
 from django.shortcuts import render
 from django.http import JsonResponse
@@ -9,7 +10,15 @@ from rest_framework import status
 from .models import BoardGames, GameDetails, RecommendationFeedback
 from .serializers import BoardGamesSerializer, GameDetailsSerializer
 from django.conf import settings
+from django.db.models import Q
 from googleapiclient.discovery import build
+
+RECOMMENDATION_BLOCKED_GAME_IDS = {521}
+BOARDGAME_FALLBACK_IMAGE_URL = '/static/boardgame_fallback.png'
+
+
+def _game_display_title(boardgame):
+    return boardgame.korean_title or boardgame.title
 
 # --- HTML & AJAX Views ---
 
@@ -57,11 +66,245 @@ def filter_games(request):
         data.append({
             'game_id': g.game_id,
             'title': g.title,
+            'display_title': _game_display_title(g),
             'rank': g.rank,
             'released_year': g.released_year,
         })
         
     return JsonResponse({'games': data})
+
+
+def _choice(value, default='상관없음'):
+    value = str(value or '').strip()
+    return value or default
+
+
+def _parse_player_range(value):
+    text = _choice(value, '')
+    numbers = [int(number) for number in re.findall(r'\d+', text)]
+    if not numbers:
+        return None
+    if '이상' in text:
+        return numbers[0], numbers[0]
+    if len(numbers) >= 2:
+        return min(numbers[0], numbers[1]), max(numbers[0], numbers[1])
+    return numbers[0], numbers[0]
+
+
+def _parse_time_range(value):
+    text = _choice(value, '')
+    if not text:
+        return None, None
+    if '30' in text:
+        return None, 30
+    if '1시간' in text:
+        return None, 75
+    if '2시간' in text and '이상' in text:
+        return 90, None
+
+    numbers = [int(number) for number in re.findall(r'\d+', text)]
+    if not numbers:
+        return None, None
+    if '이상' in text:
+        return numbers[0], None
+    return None, numbers[0]
+
+
+def _difficulty_bounds(value, relaxed=False):
+    text = _choice(value, '')
+    if any(keyword in text for keyword in ['쉬움', '초보', '입문']):
+        return None, 2.0 if relaxed else 1.8
+    if '보통' in text:
+        return 1.6 if relaxed else 1.8, 2.8 if relaxed else 2.6
+    if any(keyword in text for keyword in ['어려움', '긱', '고수']):
+        return 2.6 if relaxed else 2.8, None
+    return None, None
+
+
+def _apply_recommend_filters(queryset, player_range, time_range, difficulty_bounds):
+    if player_range:
+        min_players, max_players = player_range
+        queryset = queryset.filter(min_players__lte=min_players, max_players__gte=max_players)
+
+    min_time, max_time = time_range
+    if min_time is not None:
+        queryset = queryset.filter(playing_time__gte=min_time)
+    if max_time is not None:
+        queryset = queryset.filter(playing_time__lte=max_time)
+
+    min_weight, max_weight = difficulty_bounds
+    if min_weight is not None:
+        queryset = queryset.filter(weight__gte=min_weight)
+    if max_weight is not None:
+        queryset = queryset.filter(weight__lte=max_weight)
+
+    return queryset
+
+
+def _rank_signal(value):
+    return value if value and value > 0 else 999999
+
+
+def _candidate_sort_key(detail, difficulty, preference):
+    difficulty_text = _choice(difficulty, '')
+    preference_text = _choice(preference, '')
+    rank = detail.boardgame.rank or 999999
+    weight = detail.weight if detail.weight is not None else 0
+    party_rank = _rank_signal(detail.boardgame.party_rank)
+    family_rank = _rank_signal(detail.boardgame.family_rank)
+
+    if any(keyword in preference_text for keyword in ['파티', '시끌', '마피아', '블러핑']):
+        return party_rank, family_rank, weight, rank
+
+    if any(keyword in difficulty_text for keyword in ['쉬움', '초보', '입문']):
+        return family_rank, party_rank, weight, rank
+
+    if '보통' in difficulty_text:
+        return abs(weight - 2.2), rank
+    if any(keyword in difficulty_text for keyword in ['어려움', '긱', '고수']):
+        return abs(weight - 3.2), rank
+    return rank, weight
+
+
+def _build_recommend_candidates(players, time, difficulty, preference, exclude_game_ids=None, limit=60, rank_limit=4000):
+    base = (
+        GameDetails.objects
+        .select_related('boardgame')
+        .filter(boardgame__rank__lte=rank_limit)
+        .exclude(boardgame__korean_title='')
+        .exclude(boardgame_id__in=RECOMMENDATION_BLOCKED_GAME_IDS)
+        .order_by('boardgame__rank')
+    )
+    player_range = _parse_player_range(players)
+    time_range = _parse_time_range(time)
+    excluded_ids = set(exclude_game_ids or [])
+    candidates_by_id = {}
+
+    def add_candidates(queryset):
+        for detail in sorted(queryset[:300], key=lambda item: _candidate_sort_key(item, difficulty, preference)):
+            game_id = detail.boardgame.game_id
+            if game_id in excluded_ids or game_id in candidates_by_id:
+                continue
+            candidates_by_id[game_id] = detail
+            if len(candidates_by_id) >= limit:
+                return True
+        return False
+
+    strict = _apply_recommend_filters(
+        base,
+        player_range,
+        time_range,
+        _difficulty_bounds(difficulty, relaxed=False),
+    )
+    if add_candidates(strict):
+        return list(candidates_by_id.values())
+
+    relaxed = _apply_recommend_filters(
+        base,
+        player_range,
+        time_range,
+        _difficulty_bounds(difficulty, relaxed=True),
+    )
+    if add_candidates(relaxed):
+        return list(candidates_by_id.values())
+
+    no_difficulty = _apply_recommend_filters(base, player_range, time_range, (None, None))
+    if add_candidates(no_difficulty):
+        return list(candidates_by_id.values())
+
+    player_only = _apply_recommend_filters(base, player_range, (None, None), (None, None))
+    if add_candidates(player_only):
+        return list(candidates_by_id.values())
+
+    add_candidates(base)
+    return list(candidates_by_id.values())
+
+
+def _extract_json_array(text):
+    text = str(text or '').strip()
+    match = re.search(r'\[\s*\{.*?\}\s*\]', text, re.DOTALL)
+    if match:
+        text = match.group(0)
+    else:
+        text = text.replace('```json', '').replace('```', '').strip()
+
+    parsed = json.loads(text)
+    if isinstance(parsed, dict):
+        parsed = parsed.get('recommendations', [])
+    if not isinstance(parsed, list):
+        return []
+    return parsed
+
+
+def _fallback_reason(detail, difficulty):
+    if any(keyword in _choice(difficulty, '') for keyword in ['쉬움', '초보', '입문']):
+        return (
+            f"{detail.min_players}~{detail.max_players}인 가능, {detail.playing_time}분, "
+            f"긱 웨이트 {detail.weight:.1f}라 초보자에게 부담이 적은 편입니다."
+        )
+    return (
+        f"{detail.min_players}~{detail.max_players}인 가능, {detail.playing_time}분, "
+        f"긱 웨이트 {detail.weight:.1f}로 입력한 조건과 잘 맞습니다."
+    )
+
+
+def _cache_bgg_image(boardgame):
+    if boardgame.thumbnail_url or boardgame.image_url:
+        return boardgame.thumbnail_url or boardgame.image_url
+
+    import xml.etree.ElementTree as ET
+
+    token = getattr(settings, "BGG_TOKEN", "") or ""
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    try:
+        response = requests.get(
+            f"https://boardgamegeek.com/xmlapi2/thing?id={boardgame.game_id}",
+            headers=headers,
+            timeout=5,
+        )
+        if response.status_code == 202:
+            return ""
+        response.raise_for_status()
+
+        root = ET.fromstring(response.content)
+        item = root.find("item")
+        if item is None:
+            return ""
+
+        thumbnail = item.findtext("thumbnail", default="").strip()
+        image = item.findtext("image", default="").strip()
+        if thumbnail or image:
+            boardgame.thumbnail_url = thumbnail
+            boardgame.image_url = image
+            boardgame.save(update_fields=["thumbnail_url", "image_url"])
+        return thumbnail or image
+    except Exception as exc:
+        print(f"BGG image cache error for {boardgame.title}: {exc}")
+        return ""
+
+
+def _recommendation_item(detail, reason):
+    image_url = (
+        detail.boardgame.thumbnail_url
+        or detail.boardgame.image_url
+        or _cache_bgg_image(detail.boardgame)
+        or BOARDGAME_FALLBACK_IMAGE_URL
+    )
+    return {
+        'game_id': detail.boardgame.game_id,
+        'title': detail.boardgame.title,
+        'display_title': _game_display_title(detail.boardgame),
+        'reason': reason,
+        'min_players': detail.min_players,
+        'max_players': detail.max_players,
+        'playing_time': detail.playing_time,
+        'weight': detail.weight,
+        'image_url': image_url,
+    }
+
+
+def _attach_recommendation_images(items):
+    return items
 
 def recommend_game(request, game_id):
     try:
@@ -112,116 +355,132 @@ def recommend_game(request, game_id):
 def situation_recommend(request):
     try:
         data = request.data
-        
-        # New multi-param extraction
-        mbti = data.get('mbti', '상관없음')
-        players = data.get('players', '상관없음')
-        time = data.get('time', '상관없음')
-        difficulty = data.get('difficulty', '상관없음')
-        preference = data.get('preference', '상관없음')
-        theme = data.get('theme', '상관없음')
-        
+
+        mbti = _choice(data.get('mbti'))
+        players = _choice(data.get('players'))
+        time = _choice(data.get('time'))
+        difficulty = _choice(data.get('difficulty'))
+        preference = _choice(data.get('preference'))
+        theme = _choice(data.get('theme'))
+        ai_comment = _choice(data.get('ai_comment'), '')
+        exclude_game_ids = set()
+        for raw_id in data.get('exclude_game_ids') or []:
+            try:
+                exclude_game_ids.add(int(raw_id))
+            except (TypeError, ValueError):
+                continue
+
         situation = f"MBTI: {mbti}, 인원수: {players}, 시간: {time}, 난이도: {difficulty}, 성향: {preference}, 테마: {theme}"
-        
+        if ai_comment:
+            situation = f"{situation}, 추가 요청: {ai_comment[:500]}"
+
+        candidates = _build_recommend_candidates(
+            players,
+            time,
+            difficulty,
+            preference,
+            exclude_game_ids=exclude_game_ids,
+        )
+        if not candidates:
+            return JsonResponse({
+                'error': '새로 추천할 다른 후보가 부족합니다. 조건을 조금 완화해 주세요.'
+            }, status=404)
+
+        candidate_by_id = {detail.boardgame.game_id: detail for detail in candidates}
+        candidate_lines = [
+            (
+                f"- game_id={detail.boardgame.game_id} | {_game_display_title(detail.boardgame)} ({detail.boardgame.title}) | "
+                f"인원 {detail.min_players}~{detail.max_players}인 | "
+                f"시간 {detail.playing_time}분 | 긱 웨이트 {detail.weight:.2f} | "
+                f"BGG rank {detail.boardgame.rank} | "
+                f"party rank {detail.boardgame.party_rank or '없음'} | "
+                f"family rank {detail.boardgame.family_rank or '없음'}"
+            )
+            for detail in candidates
+        ]
+        game_list_str = "\n".join(candidate_lines)
+
         gms_key = os.environ.get('GMS_KEY', '')
         gms_endpoint = os.environ.get('GMS_ENDPOINT', 'https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions')
-        if not gms_key:
-            return JsonResponse({'error': 'GMS_KEY is not set.'}, status=500)
-            
-        import random
-        all_ids = list(GameDetails.objects.filter(boardgame__rank__lte=1000).values_list('id', flat=True))
-        if all_ids:
-            selected_ids = random.sample(all_ids, min(150, len(all_ids)))
-            details = GameDetails.objects.filter(id__in=selected_ids).select_related('boardgame')
-        else:
-            details = []
-            
-        game_list_lines = []
-        for d in details:
-            game_list_lines.append(f"- {d.boardgame.title} (인원: {d.min_players}~{d.max_players}인, 시간: {d.playing_time}분, 난이도: {d.weight}/5.0)")
-            
-        game_list_str = "\n".join(game_list_lines) if game_list_lines else "(현재 DB에 게임 정보가 없습니다)"
-        
-        system_prompt = """당신은 방구석에서 10년 동안 보드게임만 연구한, 통찰력 있는 B급 감성의 보드게임 오타쿠 전문가입니다.
-사용자가 입력한 다중 조건(MBTI, 인원수, 시간, 난이도, 성향, 테마)과 제공된 [데이터베이스 목록]의 게임 스펙(인원, 시간, 난이도)을 꼼꼼히 대조하여, 조건에 가장 잘 맞는 게임 딱 3개만 고르세요.
-추천 이유는 존댓말을 유지하되, 매우 유쾌하고 친근하며 재치 있는 말투로 작성해주세요.
-인사말이나 부연 설명은 절대 하지 말고, 오직 지정된 JSON 배열 포맷만 출력하세요."""
 
-        user_prompt = f"""[우리 데이터베이스 목록 (스펙 포함)]
+        ai_choices = []
+        if gms_key:
+            system_prompt = """당신은 보드게임 추천 큐레이터입니다.
+제공된 후보 목록은 서버가 인원, 시간, 난이도로 이미 검증한 게임입니다.
+반드시 후보 목록 안의 game_id만 골라야 합니다. 후보 밖 게임, 모르는 게임, 새 제목을 절대 만들지 마세요.
+특히 초보자는 BoardGameGeek weight 2.0 초과를 어렵게 느낄 수 있으니, 쉬움/초보 조건에서는 더 낮은 weight를 우선하세요.
+인사말이나 설명 문장 없이 JSON 배열만 출력하세요."""
+
+            user_prompt = f"""[검증된 후보 목록]
 {game_list_str}
 
-[사용자 맞춤 조건]
+[사용자 조건]
 {situation}
 
-위 조건에 가장 어울리는 보드게임 3개를 추천해주세요. 
-포맷: [{{"title": "...", "reason": "..."}}]"""
+후보 중 조건에 가장 잘 맞는 게임을 최대 3개까지 골라 주세요.
+추천 이유에는 왜 인원/시간/난이도 조건에 맞는지와 사용자의 추가 요청을 어떻게 반영했는지 짧게 포함하세요.
+포맷: [{{"game_id": 123, "reason": "..."}}]"""
 
-        url = gms_endpoint
-        payload = {
-            "model": "gpt-4o-mini", 
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ]
-        }
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {gms_key}"
-        }
-        
-        res = requests.post(url, json=payload, headers=headers, timeout=60)
-        res.raise_for_status()
-        data = res.json()
-        
-        text = data['choices'][0]['message']['content']
-        # Extract json using regex
-        import re
-        match = re.search(r'\[\s*\{.*?\}\s*\]', text, re.DOTALL)
-        if match:
-            text = match.group(0)
-        else:
-            text = text.replace("```json", "").replace("```", "").strip()
-            
-        result = json.loads(text)
-        
-        import xml.etree.ElementTree as ET
-        
-        fallback_image = "/boardgame_fallback.png"
-        youtube_api_key = os.environ.get('YOUTUBE_API_KEY', '')
-        bgg_key = os.environ.get('BGG_KEY', '')
-        
-        for item in result:
-            title = item.get("title", "")
-            item["image_url"] = fallback_image
-            
-            # DB에서 title로 game_id 검색
-            game = BoardGames.objects.filter(title=title).first()
-            if game:
-                # 1순위: BGG API 시도
-                try:
-                    bgg_url = f"https://boardgamegeek.com/xmlapi2/thing?id={game.game_id}"
-                    bgg_headers = {'Authorization': f'Bearer {bgg_key}'} if bgg_key else {}
-                    bgg_res = requests.get(bgg_url, headers=bgg_headers, timeout=3)
-                    if bgg_res.status_code == 200:
-                        root = ET.fromstring(bgg_res.content)
-                        thumb = root.find(".//thumbnail")
-                        if thumb is not None and thumb.text:
-                            item["image_url"] = thumb.text
-                except Exception:
-                    pass
-                
-                # 2순위: BGG 실패 시 YouTube 썸네일 시도
-                if item["image_url"] == fallback_image and youtube_api_key:
-                    try:
-                        youtube = build('youtube', 'v3', developerKey=youtube_api_key)
-                        req = youtube.search().list(q=f"{title} 보드게임", part="snippet", type="video", maxResults=1)
-                        yt_res = req.execute()
-                        if yt_res['items']:
-                            item["image_url"] = yt_res['items'][0]['snippet']['thumbnails']['high']['url']
-                    except Exception as e:
-                        print(f"YouTube Thumbnail Error for {title}: {e}")
-        
-        return JsonResponse({'recommendations': result})
+            payload = {
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "temperature": 0.2,
+            }
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {gms_key}"
+            }
+
+            try:
+                res = requests.post(gms_endpoint, json=payload, headers=headers, timeout=60)
+                res.raise_for_status()
+                ai_data = res.json()
+                ai_choices = _extract_json_array(ai_data['choices'][0]['message']['content'])
+            except Exception as e:
+                print("GMS recommendation fallback:", e)
+
+        result = []
+        used_ids = set()
+        title_to_candidate = {detail.boardgame.title.strip().lower(): detail for detail in candidates}
+        title_to_candidate.update({
+            detail.boardgame.korean_title.strip().lower(): detail
+            for detail in candidates
+            if detail.boardgame.korean_title
+        })
+
+        for item in ai_choices:
+            raw_game_id = item.get('game_id') or item.get('id')
+            detail = None
+            try:
+                detail = candidate_by_id.get(int(raw_game_id))
+            except (TypeError, ValueError):
+                title = str(item.get('title', '')).strip().lower()
+                detail = title_to_candidate.get(title)
+
+            if not detail or detail.boardgame.game_id in used_ids:
+                continue
+
+            reason = str(item.get('reason', '')).strip() or _fallback_reason(detail, difficulty)
+            result.append(_recommendation_item(detail, reason[:500]))
+            used_ids.add(detail.boardgame.game_id)
+            if len(result) == 3:
+                break
+
+        for detail in candidates:
+            if len(result) == 3:
+                break
+            if detail.boardgame.game_id in used_ids:
+                continue
+            result.append(_recommendation_item(detail, _fallback_reason(detail, difficulty)))
+            used_ids.add(detail.boardgame.game_id)
+
+        return JsonResponse({
+            'recommendations': result,
+            'candidate_count': len(candidates),
+        })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
@@ -252,7 +511,7 @@ def recommendation_feedback(request):
     except (TypeError, ValueError):
         return JsonResponse({'status': 'error', 'message': '인원수는 숫자로 입력해주세요.'}, status=400)
 
-    boardgame = BoardGames.objects.filter(title=game_title).first()
+    boardgame = BoardGames.objects.filter(Q(title=game_title) | Q(korean_title=game_title)).first()
     feedback = RecommendationFeedback.objects.create(
         user=request.user,
         boardgame=boardgame,
@@ -294,7 +553,7 @@ def details_by_title(request):
     details_data = None
     try:
         from .models import BoardGames, GameDetails
-        game = BoardGames.objects.filter(title=title).first()
+        game = BoardGames.objects.filter(Q(title=title) | Q(korean_title=title)).first()
         if game:
             game.view_count += 1
             game.save(update_fields=['view_count'])
