@@ -42,16 +42,16 @@
             <p class="recent-situation">{{ session.situation }}</p>
             <div
               v-for="item in session.recommendations"
-              :key="`${session.id}-${item.title}`"
+              :key="`${session.id}-${item.game_id || item.title}`"
               class="recent-game"
-              @click="openAiRecommendModal(item.title)"
+              @click="openAiRecommendModal(item.title, { displayTitle: displayGameTitle(item) })"
             >
               <img v-if="item.image_url" :src="item.image_url" alt="board game cover" />
               <div>
-                <strong>{{ item.title }}</strong>
+                <strong>{{ displayGameTitle(item) }}</strong>
                 <span>{{ item.reason }}</span>
               </div>
-              <button type="button" @click.stop="openReviewFromRecent(item.title)">리뷰</button>
+              <button type="button" @click.stop="openReviewFromRecent(item.title, displayGameTitle(item))">리뷰</button>
             </div>
           </div>
         </aside>
@@ -80,12 +80,12 @@
             <div v-else class="card" style="padding: 0; overflow: hidden;">
               <table class="games-table" style="margin: 0;">
                 <tbody>
-                  <tr v-for="game in visibleTrendingGames" :key="game.game_id + '-' + game.rank" @click="openGameModal(game.game_id, game.title)">
+                  <tr v-for="game in visibleTrendingGames" :key="game.game_id + '-' + game.rank" @click="openGameModal(game.game_id, displayGameTitle(game))">
                     <td style="width: 50px; text-align: center; font-weight: bold; font-size: 1.1rem;" :style="{ color: game.rank <= 3 ? 'red' : 'var(--text-light)' }">{{ game.rank }}</td>
                     <td style="font-weight: bold; position: relative;">
                       <transition name="ticker-slide" mode="out-in">
                         <div :key="game.game_id" style="display: flex; align-items: center; gap: 8px; width: 100%;">
-                          <span>{{ game.title }}</span>
+                          <span>{{ displayGameTitle(game) }}</span>
                           <span style="font-size: 0.85rem; color: var(--text-light); font-weight: normal;">
                             <i class="fa-regular fa-eye"></i> {{ game.view_count || 0 }}
                           </span>
@@ -118,11 +118,28 @@
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: left;">
           <div>
             <label style="font-weight: bold; font-size: 0.9rem;">MBTI</label>
-            <select v-model="recommendModal.params.mbti" class="input-field" style="margin-bottom: 0;">
-              <option value="">상관없음</option>
-              <option value="E (외향적)">E (외향적)</option>
-              <option value="I (내향적)">I (내향적)</option>
-            </select>
+            <div class="mbti-picker">
+              <select v-model="recommendModal.params.mbti_ei" class="input-field">
+                <option value="">-</option>
+                <option value="E">E</option>
+                <option value="I">I</option>
+              </select>
+              <select v-model="recommendModal.params.mbti_sn" class="input-field">
+                <option value="">-</option>
+                <option value="S">S</option>
+                <option value="N">N</option>
+              </select>
+              <select v-model="recommendModal.params.mbti_tf" class="input-field">
+                <option value="">-</option>
+                <option value="T">T</option>
+                <option value="F">F</option>
+              </select>
+              <select v-model="recommendModal.params.mbti_jp" class="input-field">
+                <option value="">-</option>
+                <option value="J">J</option>
+                <option value="P">P</option>
+              </select>
+            </div>
           </div>
           <div>
             <label style="font-weight: bold; font-size: 0.9rem;">인원수</label>
@@ -166,6 +183,17 @@
             <input v-model="recommendModal.params.theme" class="input-field" placeholder="예: 좀비, 판타지, 방탈출..." style="margin-bottom: 0;" @keyup.enter="submitRecommend" />
           </div>
         </div>
+
+        <div style="margin-top: 15px; text-align: left;">
+          <label style="font-weight: bold; font-size: 0.9rem;">AI에게 한마디</label>
+          <textarea
+            v-model="recommendModal.params.ai_comment"
+            class="input-field"
+            placeholder="예: 룰 설명 싫어하는 친구가 있어요. 말 많이 하고 웃긴 게임이면 좋겠어요."
+            rows="3"
+            style="margin-bottom: 0; resize: vertical;"
+          ></textarea>
+        </div>
         
         <div style="margin-top: 30px; text-align: center;">
           <button class="btn btn-brown" @click="submitRecommend" :disabled="aiLoading" style="width: 100%; padding: 1rem; font-size: 1.1rem;">
@@ -184,20 +212,27 @@
                 <strong>추천 결과</strong>
                 <p>게임을 눌러 상세 정보를 확인하고 리뷰를 남기면, 나중에 프로필에서 다시 볼 수 있어요.</p>
               </div>
-              <button class="btn btn-outline result-refresh-btn" type="button" @click="getAIRecommend" :disabled="aiLoading">
+              <button class="btn btn-outline result-refresh-btn" type="button" @click="refreshRecommendations" :disabled="aiLoading">
                 <i class="fa-solid fa-rotate"></i> 새로 추천
               </button>
             </div>
 
-            <div v-for="item in aiRecommendations" :key="item.title" class="card ai-item" @click="openAiRecommendModal(item.title)" style="margin: 0;">
-              <div class="ai-item-content" style="display: flex; gap: 15px; align-items: flex-start;">
-                <img v-if="item.image_url" :src="item.image_url" alt="board game cover" class="ai-item-image" />
-                <div class="ai-item-text" style="text-align: left;">
-                  <strong style="color: var(--primary-color); text-decoration: underline; font-size: 1.1rem;">{{ item.title }}</strong><br />
-                  <span style="font-size: 0.95rem; color: var(--text-dark); display: inline-block; margin-top: 5px;">{{ item.reason }}</span>
+            <div v-if="aiLoading" class="card" style="margin: 0; text-align: center; padding: 2rem;">
+              <i class="fa-solid fa-spinner fa-spin" style="color: var(--primary-color); font-size: 1.5rem;"></i>
+              <p style="margin: 0.8rem 0 0; color: var(--text-light);">조건에 맞는 게임을 새로 고르는 중...</p>
+            </div>
+
+            <template v-else>
+              <div v-for="item in aiRecommendations" :key="item.game_id || item.title" class="card ai-item" @click="openAiRecommendModal(item.title, { displayTitle: displayGameTitle(item) })" style="margin: 0;">
+                <div class="ai-item-content" style="display: flex; gap: 15px; align-items: flex-start;">
+                  <img v-if="item.image_url" :src="item.image_url" alt="board game cover" class="ai-item-image" />
+                  <div class="ai-item-text" style="text-align: left;">
+                    <strong style="color: var(--primary-color); text-decoration: underline; font-size: 1.1rem;">{{ displayGameTitle(item) }}</strong><br />
+                    <span style="font-size: 0.95rem; color: var(--text-dark); display: inline-block; margin-top: 5px;">{{ item.reason }}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            </template>
             <p v-if="aiError" style="color: red; text-align: center;">오류: {{ aiError }}</p>
         </div>
       </template>
@@ -530,7 +565,43 @@ function startTicker() {
 
 const recommendModal = reactive({
   step: 0,
-  params: { mbti: '', players: '', time: '', difficulty: '', preference: '', theme: '' }
+  params: {
+    mbti_ei: '',
+    mbti_sn: '',
+    mbti_tf: '',
+    mbti_jp: '',
+    players: '',
+    time: '',
+    difficulty: '',
+    preference: '',
+    theme: '',
+    ai_comment: '',
+  }
+})
+const selectedMbti = computed(() => {
+  const letters = [
+    recommendModal.params.mbti_ei,
+    recommendModal.params.mbti_sn,
+    recommendModal.params.mbti_tf,
+    recommendModal.params.mbti_jp,
+  ]
+  return letters.every(Boolean) ? letters.join('') : ''
+})
+const recommendationSituation = computed(() => {
+  const labels = [
+    ['MBTI', selectedMbti.value],
+    ['인원수', recommendModal.params.players],
+    ['시간', recommendModal.params.time],
+    ['난이도', recommendModal.params.difficulty],
+    ['성향', recommendModal.params.preference],
+    ['테마', recommendModal.params.theme],
+    ['추가 요청', recommendModal.params.ai_comment],
+  ]
+  const activeLabels = labels
+    .filter(([, value]) => String(value || '').trim())
+    .map(([label, value]) => `${label}: ${value}`)
+
+  return activeLabels.length ? activeLabels.join(', ') : '상관없음'
 })
 
 const aiLoading = ref(false)
@@ -575,6 +646,10 @@ const gameModal = reactive({
 const modalFeedbackTitle = computed(() => gameModal.title.replace(' (AI 추천)', '').trim())
 const RECENT_RECOMMENDATIONS_KEY = 'boardgame_recent_recommendations'
 const GAME_GUIDE_CACHE_KEY = 'boardgame_guide_cache'
+
+function displayGameTitle(item) {
+  return item?.display_title || item?.korean_title || item?.title || ''
+}
 
 const wheelColors = ['#c45b4c', '#e0ac5f', '#5d3f2e', '#6e9f84', '#6f88b8', '#a491bc', '#d7837f']
 const ladderHeight = 260
@@ -674,20 +749,33 @@ async function fetchTrendingGames() {
   }
 }
 
-async function submitRecommend() {
+async function submitRecommend(options = {}) {
+  const excludeCurrent = options && options.excludeCurrent === true
+  const excludeGameIds = excludeCurrent
+    ? aiRecommendations.value.map((item) => item.game_id).filter(Boolean)
+    : []
+
   aiLoading.value = true
   aiError.value = ''
   aiRecommendations.value = []
   resetFeedbackForms()
+  recommendModal.step = 2
 
   try {
+    const { mbti_ei, mbti_sn, mbti_tf, mbti_jp, ...recommendParams } = recommendModal.params
+    const requestBody = {
+      ...recommendParams,
+      mbti: selectedMbti.value,
+      exclude_game_ids: excludeGameIds,
+    }
+
     const response = await fetch('/boardgames/recommend/', {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
         'X-CSRFToken': getCookie('csrftoken') || ''
       },
-      body: JSON.stringify(recommendModal.params)
+      body: JSON.stringify(requestBody)
     })
     const data = await response.json()
     if (data.error) {
@@ -696,13 +784,16 @@ async function submitRecommend() {
     }
     aiRecommendations.value = data.recommendations || []
     aiRecommendations.value.forEach((item) => ensureFeedbackForm(item.title))
-    saveRecentRecommendationSession(situation.value, aiRecommendations.value)
-    recommendModal.step = 2
+    saveRecentRecommendationSession(recommendationSituation.value, aiRecommendations.value)
   } catch (error) {
     aiError.value = error.message
   } finally {
     aiLoading.value = false
   }
+}
+
+function refreshRecommendations() {
+  submitRecommend({ excludeCurrent: true })
 }
 
 function loadRecentRecommendations() {
@@ -798,7 +889,7 @@ async function saveRecommendationFeedback(item) {
       },
       body: JSON.stringify({
         game_title: item.title,
-        situation: situation.value,
+        situation: recommendationSituation.value,
         recommendation_reason: item.reason || '',
         rating: form.rating,
         player_count: form.player_count,
@@ -834,8 +925,8 @@ function closeModalReview() {
   gameModal.reviewOpen = false
 }
 
-async function openReviewFromRecent(title) {
-  await openAiRecommendModal(title, { openReview: true })
+async function openReviewFromRecent(title, displayTitle = '') {
+  await openAiRecommendModal(title, { openReview: true, displayTitle })
 }
 
 function openToolModal(type) {
@@ -1153,7 +1244,8 @@ async function fetchGameSmartGuide(gameId) {
 }
 
 async function openAiRecommendModal(title, options = {}) {
-  resetGameModal(`${title} (AI 추천)`)
+  const modalTitle = options.displayTitle || title
+  resetGameModal(`${modalTitle} (AI 추천)`)
   gameModal.loading = true
   gameModal.guideLoading = true
 
