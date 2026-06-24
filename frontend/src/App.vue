@@ -52,21 +52,24 @@
         <div v-else class="card" style="padding: 0; overflow: hidden;">
           <table class="games-table" style="margin: 0;">
             <tbody>
-              <tr v-for="(game, index) in visibleTrendingGames" :key="game.game_id" @click="openGameModal(game.game_id, game.title)">
-                <td style="width: 50px; text-align: center; font-weight: bold; font-size: 1.1rem;" :style="{ color: index < 3 ? 'red' : 'var(--text-light)' }">{{ index + 1 }}</td>
-                <td style="font-weight: bold;">{{ game.title }}</td>
-                <td style="width: 80px; text-align: right; color: var(--text-light); padding-right: 20px;">
-                  <i class="fa-regular fa-eye"></i> {{ game.view_count || 0 }}
+              <tr v-for="game in visibleTrendingGames" :key="game.game_id + '-' + game.rank" @click="openGameModal(game.game_id, game.title)">
+                <td style="width: 50px; text-align: center; font-weight: bold; font-size: 1.1rem;" :style="{ color: game.rank <= 3 ? 'red' : 'var(--text-light)' }">{{ game.rank }}</td>
+                <td style="font-weight: bold; position: relative;">
+                  <transition name="ticker-slide" mode="out-in">
+                    <div :key="game.game_id" style="display: flex; align-items: center; gap: 8px; width: 100%;">
+                      <span>{{ game.title }}</span>
+                      <span style="font-size: 0.85rem; color: var(--text-light); font-weight: normal;">
+                        <i class="fa-regular fa-eye"></i> {{ game.view_count || 0 }}
+                      </span>
+                    </div>
+                  </transition>
+                </td>
+                <td style="width: 50px; text-align: right; color: var(--text-light); padding-right: 20px; cursor: pointer;" @click.stop="showAllTrending = !showAllTrending">
+                  <i v-if="!showAllTrending || game.rank === 1" class="fa-solid" :class="showAllTrending ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
                 </td>
               </tr>
             </tbody>
           </table>
-          <button v-if="!showAllTrending && trendingGames.length > 5" @click="showAllTrending = true" class="btn" style="width: 100%; margin: 0; background: #f9f9f9; color: var(--text-dark); box-shadow: none; border-radius: 0; border-top: 1px solid #eee;">
-            더보기 <i class="fa-solid fa-chevron-down"></i>
-          </button>
-          <button v-if="showAllTrending" @click="showAllTrending = false" class="btn" style="width: 100%; margin: 0; background: #f9f9f9; color: var(--text-dark); box-shadow: none; border-radius: 0; border-top: 1px solid #eee;">
-            접기 <i class="fa-solid fa-chevron-up"></i>
-          </button>
         </div>
       </div>
     </section>
@@ -420,16 +423,33 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 
 const view = ref('main')
 const trendingGames = ref([])
 const trendingLoading = ref(false)
 const showAllTrending = ref(false)
 
+const currentTickerIndex = ref(0)
+let tickerInterval = null
+
 const visibleTrendingGames = computed(() => {
-  return showAllTrending.value ? trendingGames.value : trendingGames.value.slice(0, 5)
+  if (showAllTrending.value) {
+    return trendingGames.value.slice(0, 10).map((game, i) => ({ ...game, rank: i + 1 }))
+  } else {
+    if (trendingGames.value.length === 0) return []
+    const idx = currentTickerIndex.value
+    return [{ ...trendingGames.value[idx], rank: idx + 1 }]
+  }
 })
+
+function startTicker() {
+  tickerInterval = setInterval(() => {
+    if (trendingGames.value.length > 0 && !showAllTrending.value) {
+      currentTickerIndex.value = (currentTickerIndex.value + 1) % Math.min(10, trendingGames.value.length)
+    }
+  }, 2500)
+}
 
 const recommendModal = reactive({
   step: 0,
@@ -534,6 +554,11 @@ onMounted(() => {
   fetchCurrentUser()
   fetchTrendingGames()
   openInitialToolFromUrl()
+  startTicker()
+})
+
+onUnmounted(() => {
+  if (tickerInterval) clearInterval(tickerInterval)
 })
 
 function showMain() {
