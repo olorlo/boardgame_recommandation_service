@@ -52,9 +52,16 @@ class Command(BaseCommand):
             default="all",
             help="Prioritize/fetch games with a category rank.",
         )
+        parser.add_argument(
+            "--korean-only",
+            action="store_true",
+            help="Only fetch games that already have a Korean title.",
+        )
 
     def handle(self, *args, **options):
         queryset = BoardGames.objects.filter(rank__gt=0, rank__lte=options["rank_max"]).order_by("rank")
+        if options["korean_only"]:
+            queryset = queryset.exclude(korean_title="")
         if options["category"] == "party":
             queryset = queryset.filter(party_rank__isnull=False).order_by("party_rank", "rank")
         elif options["category"] == "family":
@@ -92,15 +99,15 @@ class Command(BaseCommand):
                 game.image_url = payload["image_url"]
                 game.save(update_fields=["thumbnail_url", "image_url"])
                 created += 1
-                self.stdout.write(
+                self.stdout.write(self.safe_text(
                     f"[{index}/{total}] {game.title}: "
                     f"{payload['min_players']}~{payload['max_players']}p, "
                     f"{payload['playing_time']}m, weight {payload['weight']:.2f}, "
                     f"image={'yes' if payload['thumbnail_url'] or payload['image_url'] else 'no'}"
-                )
+                ))
             except Exception as exc:
                 failed += 1
-                self.stdout.write(self.style.ERROR(f"[{index}/{total}] failed {game.title}: {exc}"))
+                self.stdout.write(self.style.ERROR(self.safe_text(f"[{index}/{total}] failed {game.title}: {exc}")))
 
             if index < total and options["sleep"] > 0:
                 time.sleep(options["sleep"])
@@ -124,6 +131,14 @@ class Command(BaseCommand):
             if response.status_code == 202:
                 time.sleep(max(2, sleep_seconds))
                 continue
+            if response.status_code == 429 and attempt < max_retries:
+                retry_after = response.headers.get("Retry-After")
+                try:
+                    wait_seconds = float(retry_after)
+                except (TypeError, ValueError):
+                    wait_seconds = max(10, sleep_seconds * 4)
+                time.sleep(wait_seconds)
+                continue
             response.raise_for_status()
 
             root = ET.fromstring(response.content)
@@ -137,6 +152,11 @@ class Command(BaseCommand):
         if last_response is not None:
             last_response.raise_for_status()
         return None
+
+    def safe_text(self, value):
+        output = getattr(self.stdout, "_out", None)
+        encoding = getattr(output, "encoding", None) or "utf-8"
+        return str(value).encode(encoding, errors="replace").decode(encoding)
 
     def parse_item(self, item):
         min_players = self.int_value(item.find("minplayers"), default=1)

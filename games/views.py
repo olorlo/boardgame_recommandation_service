@@ -166,16 +166,29 @@ def _candidate_sort_key(detail, difficulty, preference):
     return rank, weight
 
 
-def _build_recommend_candidates(players, time, difficulty, preference, limit=60, rank_limit=3000):
+def _build_recommend_candidates(players, time, difficulty, preference, exclude_game_ids=None, limit=60, rank_limit=4000):
     base = (
         GameDetails.objects
         .select_related('boardgame')
         .filter(boardgame__rank__lte=rank_limit)
+        .exclude(boardgame__korean_title='')
         .exclude(boardgame_id__in=RECOMMENDATION_BLOCKED_GAME_IDS)
         .order_by('boardgame__rank')
     )
     player_range = _parse_player_range(players)
     time_range = _parse_time_range(time)
+    excluded_ids = set(exclude_game_ids or [])
+    candidates_by_id = {}
+
+    def add_candidates(queryset):
+        for detail in sorted(queryset[:300], key=lambda item: _candidate_sort_key(item, difficulty, preference)):
+            game_id = detail.boardgame.game_id
+            if game_id in excluded_ids or game_id in candidates_by_id:
+                continue
+            candidates_by_id[game_id] = detail
+            if len(candidates_by_id) >= limit:
+                return True
+        return False
 
     strict = _apply_recommend_filters(
         base,
@@ -183,19 +196,28 @@ def _build_recommend_candidates(players, time, difficulty, preference, limit=60,
         time_range,
         _difficulty_bounds(difficulty, relaxed=False),
     )
-    candidates = list(strict[:200])
+    if add_candidates(strict):
+        return list(candidates_by_id.values())
 
-    if len(candidates) < 12:
-        relaxed = _apply_recommend_filters(
-            base,
-            player_range,
-            time_range,
-            _difficulty_bounds(difficulty, relaxed=True),
-        )
-        candidates = list(relaxed[:200])
+    relaxed = _apply_recommend_filters(
+        base,
+        player_range,
+        time_range,
+        _difficulty_bounds(difficulty, relaxed=True),
+    )
+    if add_candidates(relaxed):
+        return list(candidates_by_id.values())
 
-    candidates = sorted(candidates, key=lambda detail: _candidate_sort_key(detail, difficulty, preference))
-    return candidates[:limit]
+    no_difficulty = _apply_recommend_filters(base, player_range, time_range, (None, None))
+    if add_candidates(no_difficulty):
+        return list(candidates_by_id.values())
+
+    player_only = _apply_recommend_filters(base, player_range, (None, None), (None, None))
+    if add_candidates(player_only):
+        return list(candidates_by_id.values())
+
+    add_candidates(base)
+    return list(candidates_by_id.values())
 
 
 def _extract_json_array(text):
@@ -352,12 +374,13 @@ def situation_recommend(request):
         if ai_comment:
             situation = f"{situation}, 추가 요청: {ai_comment[:500]}"
 
-        candidates = _build_recommend_candidates(players, time, difficulty, preference)
-        if exclude_game_ids:
-            candidates = [
-                detail for detail in candidates
-                if detail.boardgame.game_id not in exclude_game_ids
-            ]
+        candidates = _build_recommend_candidates(
+            players,
+            time,
+            difficulty,
+            preference,
+            exclude_game_ids=exclude_game_ids,
+        )
         if not candidates:
             return JsonResponse({
                 'error': '새로 추천할 다른 후보가 부족합니다. 조건을 조금 완화해 주세요.'
