@@ -168,7 +168,7 @@ def _candidate_sort_key(detail, difficulty, preference):
     return rank, weight
 
 
-def _build_recommend_candidates(players, time, difficulty, preference, exclude_game_ids=None, limit=60, rank_limit=4000):
+def _build_recommend_candidates(players, time, difficulty, preference, exclude_game_ids=None, limit=60, rank_limit=3000):
     base = (
         GameDetails.objects
         .select_related('boardgame')
@@ -490,6 +490,18 @@ def _rule_summary_to_text(payload):
     ])
 
 
+def _stored_rule_summary(rule_summary, fallback_title):
+    text = str(rule_summary.summary or "").strip()
+    if not text:
+        return "", None
+
+    try:
+        payload = _normalize_rule_summary_payload(json.loads(text), fallback_title)
+        return _rule_summary_to_text(payload), payload
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return _clean_rule_summary(text), None
+
+
 def _fallback_rule_summary_payload(boardgame, details=None):
     reason = "정확한 룰 근거가 부족해 룰북이나 영상을 함께 확인하는 것이 좋습니다."
     if details:
@@ -503,6 +515,12 @@ def _fallback_rule_summary_payload(boardgame, details=None):
 
 
 def _rule_summary_for_game(boardgame, details=None):
+    stored = RuleSummary.objects.filter(boardgame=boardgame).first()
+    if stored:
+        summary, payload = _stored_rule_summary(stored, _game_display_title(boardgame))
+        if summary:
+            return summary, payload
+
     gms_key = os.environ.get('GMS_KEY', '')
     if not gms_key:
         payload = _fallback_rule_summary_payload(boardgame, details)
@@ -578,6 +596,15 @@ JSON 외의 문자는 출력하지 마세요.
         payload = _normalize_rule_summary_payload(
             _extract_json_object(raw_summary),
             _game_display_title(boardgame),
+        )
+        RuleSummary.objects.update_or_create(
+            boardgame=boardgame,
+            defaults={
+                "summary": json.dumps(payload, ensure_ascii=False),
+                "source": "ai_bgg_context",
+                "model_name": "gpt-4o-mini",
+                "is_verified": False,
+            },
         )
         return _rule_summary_to_text(payload), payload
     except Exception as exc:
@@ -833,6 +860,8 @@ def details_by_title(request):
         if game:
             game.view_count += 1
             game.save(update_fields=['view_count'])
+            if not (game.thumbnail_url or game.image_url):
+                _cache_bgg_image(game)
             details = GameDetails.objects.filter(boardgame=game).first()
             if details:
                 details_data = GameDetailsSerializer(details).data
@@ -870,13 +899,19 @@ def boardgame_detail(request, game_id):
         game = BoardGames.objects.get(game_id=game_id)
         game.view_count += 1
         game.save(update_fields=['view_count'])
+        if not (game.thumbnail_url or game.image_url):
+            _cache_bgg_image(game)
         
         details = GameDetails.objects.filter(boardgame=game)
         if details.exists():
             serializer = GameDetailsSerializer(details.first())
             return Response(serializer.data)
-        else:
-            return Response({"message": "상세 정보가 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = BoardGamesSerializer(game)
+        return Response({
+            "boardgame": serializer.data,
+            "message": "상세 통계 정보가 없습니다.",
+        })
     except BoardGames.DoesNotExist:
         return Response({"message": "해당 게임을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -898,7 +933,32 @@ def top_boardgame(request):
 
 @api_view(['GET'])
 def trending_boardgames(request):
-    # view_count descending, then rank ascending
-    games = BoardGames.objects.all().order_by('-view_count', 'rank')[:10]
+    try:
+        page = max(1, int(request.GET.get('page', 1)))
+    except (TypeError, ValueError):
+        page = 1
+
+    try:
+        page_size = int(request.GET.get('page_size', 50))
+    except (TypeError, ValueError):
+        page_size = 50
+    page_size = max(1, min(page_size, 100))
+
+    queryset = BoardGames.objects.filter(rank__gt=0, rank__lte=3000).order_by('-view_count', 'rank')
+    total_count = queryset.count()
+    total_pages = max(1, (total_count + page_size - 1) // page_size)
+    page = min(page, total_pages)
+    start = (page - 1) * page_size
+    end = start + page_size
+
+    games = queryset[start:end]
     serializer = BoardGamesSerializer(games, many=True)
-    return Response({'games': serializer.data})
+    return Response({
+        'games': serializer.data,
+        'page': page,
+        'page_size': page_size,
+        'total_count': total_count,
+        'total_pages': total_pages,
+        'has_previous': page > 1,
+        'has_next': page < total_pages,
+    })
