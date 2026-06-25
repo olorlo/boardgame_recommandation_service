@@ -19,6 +19,8 @@ staticfiles/
 
 # Data Files
 *.csv
+!boardgames_ranks.csv
+!data/game_details.csv
 dummy_reviews_gen.json
 
 # User uploads
