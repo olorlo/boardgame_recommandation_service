@@ -26,6 +26,9 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 BGG_TOKEN = env("BGG_TOKEN", default=env("BGG_KEY", default=""))
 #----------------------------
 
+RAILWAY_PUBLIC_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '').strip()
+IS_RAILWAY = bool(os.environ.get('RAILWAY_ENVIRONMENT_NAME') or RAILWAY_PUBLIC_DOMAIN)
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -34,9 +37,11 @@ BGG_TOKEN = env("BGG_TOKEN", default=env("BGG_KEY", default=""))
 SECRET_KEY = env('SECRET_KEY', default='django-insecure-10=)x-b(wdnn3*f!^*d1(-zz7m439**h2xysh*+my055ixe#bc')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env.bool('DEBUG', default=True)
+DEBUG = env.bool('DEBUG', default=not IS_RAILWAY)
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost'])
+if RAILWAY_PUBLIC_DOMAIN and RAILWAY_PUBLIC_DOMAIN not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
 
 CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:5173',
@@ -44,6 +49,10 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:5173',
     'http://localhost:5174',
 ] + env.list('CSRF_TRUSTED_ORIGINS', default=[])
+if RAILWAY_PUBLIC_DOMAIN:
+    railway_origin = f'https://{RAILWAY_PUBLIC_DOMAIN}'
+    if railway_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(railway_origin)
 
 
 # Application definition
