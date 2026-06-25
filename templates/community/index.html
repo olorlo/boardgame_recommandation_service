@@ -1,147 +1,160 @@
 {% extends 'base.html' %}
 {% block content %}
-<section class="page-header">
-    <h2>낙서장</h2>
-    <p class="subtitle">보드게임 이야기를 가볍게 남겨보세요.</p>
+<div class="std-page-container" style="max-width: 1200px; margin: 0 auto;">
+<section class="page-header" style="text-align: center;">
+    <h2 class="std-page-title">낙서장</h2>
+    <p class="std-body std-subtext">보드게임 이야기를 가볍게 남겨보세요.</p>
     {% if tag_filter %}
     <div style="margin-top: 15px;">
-        <span style="background: var(--box-bg); padding: 8px 15px; border: 2px inset #eadecc; font-weight: bold; color: var(--accent-color);">
+        <span class="std-tag" style="padding: 8px 15px;">
             <i class="fa-solid fa-tag"></i> {{ tag_filter }} 관련 글 모아보기
-            <a href="{% url 'community:index' %}" style="margin-left: 10px; color: var(--text-light); text-decoration: none;"><i class="fa-solid fa-xmark"></i></a>
+            <a href="{% url 'community:index' %}" style="margin-left: 10px; color: inherit; text-decoration: none;"><i class="fa-solid fa-xmark"></i></a>
         </span>
     </div>
     {% endif %}
 </section>
 
 <!-- Actions Bar (Search + Compose Button) -->
-<section class="community-actions-bar">
-    <div class="actions-left-search">
-        <form action="{% url 'community:index' %}" method="GET" class="search-form">
-            <div class="search-wrapper">
-                <input type="text" name="q" value="{{ query }}" placeholder="글 내용 또는 작성자 검색..." class="input-field search-input">
-                <button type="submit" class="btn btn-brown search-submit">
-                    <i class="fa-solid fa-magnifying-glass"></i> 검색
-                </button>
-                {% if query %}
-                <a href="{% url 'community:index' %}" class="btn btn-outline search-clear">
-                    초기화
-                </a>
-                {% endif %}
-            </div>
+<section class="community-actions-bar" style="display: flex; flex-wrap: nowrap; gap: 1rem; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 2rem;">
+    <div class="actions-left-search" style="flex: 1; min-width: 0;">
+        <form action="{% url 'community:index' %}" method="GET" class="search-form" style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" name="q" value="{{ query }}" placeholder="글 내용/작성자 검색" class="std-input" style="margin-bottom: 0; padding: 0.4rem 0.6rem; font-size: 0.85rem; max-width: 250px;">
+            <button type="submit" class="std-btn" style="white-space: nowrap; padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                <i class="fa-solid fa-magnifying-glass"></i> 검색
+            </button>
+            {% if query %}
+            <a href="{% url 'community:index' %}" class="std-btn" style="white-space: nowrap; padding: 0.4rem 0.8rem; font-size: 0.85rem;">초기화</a>
+            {% endif %}
         </form>
     </div>
 
-    <div class="actions-right-compose">
+    <div class="actions-right-compose" style="white-space: nowrap;">
         {% if user.is_authenticated %}
-        <button class="btn btn-yellow open-compose-btn" onclick="openComposeModal()">
+        <button class="std-btn std-btn-primary" onclick="openComposeModal()" style="padding: 0.5rem 1rem; font-size: 0.9rem;">
             <i class="fa-solid fa-pencil"></i> 낙서하기
         </button>
         {% else %}
-        <a href="{% url 'accounts:login' %}" class="btn btn-yellow open-compose-btn" style="text-decoration: none;">
+        <a href="{% url 'accounts:login' %}" class="std-btn std-btn-primary" style="padding: 0.5rem 1rem; font-size: 0.9rem; text-decoration: none;">
             <i class="fa-solid fa-pencil"></i> 로그인 후 낙서하기
         </a>
         {% endif %}
     </div>
 </section>
 
-<section class="note-grid">
+<section class="retro-note-grid" id="communityNoteGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem;">
     {% for article in articles %}
-    <article class="card note-card note-color-{% cycle 'red' 'yellow' 'blue' 'green' %}">
-        <div class="note-header">
-            <div class="note-author">
+    <article class="retro-note-card note-card-item" id="note-card-{{ forloop.counter0 }}" {% if forloop.counter0 >= 16 %}style="display: none;"{% endif %}>
+        <!-- Header -->
+        <div class="note-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <div class="note-author std-card-title" style="margin-bottom: 0; font-size: 0.9rem; flex: 1;">
                 <i class="fa-solid fa-user-astronaut"></i>
-                <a href="{% url 'accounts:profile' article.user.pk %}">{{ article.user.username }}</a>
+                <a href="{% url 'accounts:profile' article.user.pk %}" style="color: inherit; text-decoration: none; margin-right: 8px;">{{ article.user.username }}</a>
+                <span class="std-subtext" style="color: var(--text-light); font-size: 0.75rem;">{{ article.created_at|date:"Y.m.d" }}</span>
             </div>
-
             {% if user == article.user %}
-            <div class="note-actions">
-                <a href="{% url 'community:update' article.pk %}" aria-label="수정"><i class="fa-solid fa-pen"></i></a>
+            <div class="note-actions" style="white-space: nowrap;">
+                <a href="{% url 'community:update' article.pk %}" aria-label="수정" style="color: var(--text-light); margin-right: 8px; font-size: 0.85rem;"><i class="fa-solid fa-pen"></i></a>
                 <form action="{% url 'community:delete' article.pk %}" method="POST" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" aria-label="삭제"><i class="fa-solid fa-trash"></i></button>
+                    <button type="submit" aria-label="삭제" style="background: none; border: none; color: var(--text-light); cursor: pointer; font-size: 0.85rem; padding: 0;"><i class="fa-solid fa-trash"></i></button>
                 </form>
             </div>
             {% endif %}
         </div>
 
-        <p class="note-content">{{ article.content }}</p>
+        <!-- Content -->
+        <div class="note-body" style="flex: 1; overflow: hidden; margin-bottom: 0.5rem;">
+            <p style="font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; font-weight: 500; font-size: 0.95rem; line-height: 1.5; margin: 0; white-space: pre-wrap; word-break: break-all; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis;">{{ article.content }}</p>
+        </div>
 
+        <!-- Tags -->
         {% if article.tags.all %}
-        <div class="note-tags" style="margin-top: 10px; margin-bottom: 10px;">
+        <div class="note-tags" style="margin-bottom: 0.5rem;">
             {% for tag in article.tags.all %}
-            <a href="{% url 'community:index' %}?tag={{ tag.name|urlencode }}" class="tag-badge" style="display: inline-block; background: var(--box-bg); color: var(--primary-color); padding: 4px 10px; border: 2px inset #eadecc; font-size: 0.85rem; text-decoration: none; font-weight: bold; margin-right: 5px;">#{{ tag.name }}</a>
+            <a href="{% url 'community:index' %}?tag={{ tag.name|urlencode }}" class="std-tag" style="font-size: 0.75rem; padding: 2px 6px;">#{{ tag.name }}</a>
             {% endfor %}
         </div>
         {% endif %}
 
-        <div class="note-footer">
+        <!-- Hearts -->
+        <div class="note-footer" style="border-top: 2px dashed #eadecc; padding-top: 0.4rem; display: flex; align-items: center; margin-bottom: 0.4rem;">
             <div class="note-like">
                 {% if user.is_authenticated %}
                 <form class="like-forms" data-article-id="{{ article.pk }}">
                     {% csrf_token %}
-                    <button type="submit">
+                    <button type="submit" style="background: none; border: none; font-size: 1rem; color: var(--accent-color); cursor: pointer; padding: 0;">
                         {% if user in article.like_users.all %}
                             <i class="fa-solid fa-heart" id="like-icon-{{ article.pk }}"></i>
                         {% else %}
                             <i class="fa-regular fa-heart" id="like-icon-{{ article.pk }}"></i>
                         {% endif %}
-                        <span id="like-count-{{ article.pk }}">{{ article.like_users.all|length }}</span>
+                        <span id="like-count-{{ article.pk }}" style="font-size: 0.9rem;">{{ article.like_users.all|length }}</span>
                     </button>
                 </form>
                 {% else %}
-                    <span><i class="fa-solid fa-heart"></i> {{ article.like_users.all|length }}</span>
+                    <span style="font-size: 1rem; color: var(--accent-color);"><i class="fa-solid fa-heart"></i> <span style="font-size: 0.9rem;">{{ article.like_users.all|length }}</span></span>
                 {% endif %}
             </div>
         </div>
 
-        <!-- Reply Section (Comments) -->
-        <div class="note-comments-section">
-            {% if article.comments.all %}
-            <div class="comments-list">
+        <!-- Replies -->
+        <div class="note-comments-section" style="background: var(--box-bg); padding: 0.5rem; border: 2px inset #eadecc; height: 90px; display: flex; flex-direction: column;">
+            <div class="comments-list" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem; padding-right: 5px;">
                 {% for comment in article.comments.all %}
-                <div class="comment-item">
-                    <div class="comment-bubble">
-                        <span class="comment-author"><a href="{% url 'accounts:profile' comment.user.pk %}">{{ comment.user.username }}</a></span>
-                        <span class="comment-content">{{ comment.content }}</span>
+                <div class="comment-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div class="comment-bubble" style="flex: 1; word-break: break-all; font-size: 0.8rem; line-height: 1.2;">
+                        <span class="comment-author" style="font-weight: bold; margin-right: 4px;"><a href="{% url 'accounts:profile' comment.user.pk %}" style="color: var(--primary-color); text-decoration: none;">{{ comment.user.username }}</a></span>
+                        <span style="color: #333;">{{ comment.content }}</span>
                     </div>
                     {% if user == comment.user %}
-                    <form action="{% url 'community:comment_delete' article.pk comment.pk %}" method="POST" style="display: inline;">
+                    <form action="{% url 'community:comment_delete' article.pk comment.pk %}" method="POST" style="display: inline; margin-left: 5px;">
                         {% csrf_token %}
-                        <button type="submit" class="btn-comment-delete" aria-label="삭제"><i class="fa-solid fa-xmark"></i></button>
+                        <button type="submit" style="background: none; border: none; color: var(--accent-color); cursor: pointer; padding: 0; font-size: 0.75rem;" aria-label="삭제"><i class="fa-solid fa-xmark"></i></button>
                     </form>
                     {% endif %}
                 </div>
                 {% endfor %}
             </div>
-            {% endif %}
 
             {% if user.is_authenticated %}
-            <form action="{% url 'community:comment_create' article.pk %}" method="POST" class="comment-form">
+            <form action="{% url 'community:comment_create' article.pk %}" method="POST" class="comment-form" style="display: flex; gap: 5px;">
                 {% csrf_token %}
-                <input type="text" name="content" placeholder="답글을 남겨주세요." required class="comment-input">
-                <button type="submit" class="comment-submit-btn">등록</button>
+                <input type="text" name="content" placeholder="답글..." required style="flex: 1; padding: 0.2rem 0.4rem; font-size: 0.75rem; border: 2px inset #eadecc; margin: 0; outline: none;">
+                <button type="submit" class="std-btn std-btn-primary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">등록</button>
             </form>
             {% endif %}
         </div>
     </article>
     {% empty %}
-    <div class="card empty-note">아직 낙서가 없습니다.</div>
+    <div class="std-card empty-note" style="text-align: center; grid-column: 1 / -1;">
+        <p class="std-body">아직 낙서가 없습니다.</p>
+    </div>
     {% endfor %}
 </section>
 
+{% if articles|length > 16 %}
+<div id="loadMoreContainer" style="text-align: center; margin-top: 2rem;">
+    <button id="loadMoreBtn" class="std-btn std-btn-primary" onclick="loadMoreNotes()">
+        <i class="fa-solid fa-plus"></i> 낙서 더보기
+    </button>
+</div>
+{% endif %}
+
 <!-- Compose Modal Overlay -->
 <div class="modal-overlay" id="composeModal" style="display: none;">
-    <div class="modal-content" style="max-width: 500px; text-align: left;">
-        <span class="modal-close" onclick="closeComposeModal()">&times;</span>
-        <h3 style="color: var(--primary-color); margin-top: 0; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-pencil" style="color: var(--accent-color);"></i> 새 낙서 남기기
-        </h3>
+    <div class="modal-content std-card" style="max-width: 500px; text-align: left;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h3 class="std-section-title" style="margin-bottom: 0; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-pencil" style="color: var(--accent-color);"></i> 새 낙서 남기기
+            </h3>
+            <span class="modal-close" onclick="closeComposeModal()" style="font-size: 1.5rem; cursor: pointer; color: var(--text-light);">&times;</span>
+        </div>
         <form action="{% url 'community:create' %}" method="POST" class="modal-compose-form">
             {% csrf_token %}
-            <textarea name="content" class="input-field" placeholder="오늘 게임 어땠나요? 재미있는 이야기를 자유롭게 남겨보세요! 🖍️" required style="width: 100%; min-height: 120px; resize: vertical; margin-bottom: 1.2rem; font-family: inherit; font-size: 1rem; padding: 0.8rem; border: 2px inset #eadecc; box-sizing: border-box;"></textarea>
-            <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                <button type="button" class="btn btn-outline" onclick="closeComposeModal()" style="margin: 0; width: auto; font-size: 0.95rem; padding: 0.6rem 1.2rem;">취소</button>
-                <button type="submit" class="btn btn-yellow" style="margin: 0; width: auto; font-size: 0.95rem; padding: 0.6rem 1.5rem;">
+            <textarea name="content" class="std-input" placeholder="오늘 게임 어땠나요? 재미있는 이야기를 자유롭게 남겨보세요! 🖍️" required style="min-height: 120px; resize: vertical;"></textarea>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 1rem;">
+                <button type="button" class="std-btn" onclick="closeComposeModal()">취소</button>
+                <button type="submit" class="std-btn std-btn-primary">
                     <i class="fa-regular fa-paper-plane"></i> 등록
                 </button>
             </div>
@@ -206,5 +219,25 @@
             closeComposeModal();
         }
     });
+
+    let currentVisibleCount = 16;
+    function loadMoreNotes() {
+        const items = document.querySelectorAll('.note-card-item');
+        let newlyShown = 0;
+        
+        for (let i = currentVisibleCount; i < items.length && newlyShown < 16; i++) {
+            items[i].style.display = 'inline-block';
+            newlyShown++;
+        }
+        
+        currentVisibleCount += newlyShown;
+        
+        if (currentVisibleCount >= items.length) {
+            const btnContainer = document.getElementById('loadMoreContainer');
+            if (btnContainer) {
+                btnContainer.style.display = 'none';
+            }
+        }
+    }
 </script>
 {% endblock %}

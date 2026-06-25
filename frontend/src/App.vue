@@ -116,35 +116,11 @@
           </div>
         </div>
 
-      <!-- Trending Section -->
-          <div class="trending-section" style="max-width: 800px; margin: 0 auto; text-align: left;">
-            <h3 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; margin-bottom: 15px;">
-              <i class="fa-solid fa-fire" style="color: red;"></i> 실시간 많이 찾는 보드게임
-            </h3>
-
-            <div v-if="trendingLoading" style="text-align: center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> 불러오는 중...</div>
-            <div v-else class="card" style="padding: 0; overflow: hidden;">
-              <table class="games-table" style="margin: 0;">
-                <tbody>
-                  <tr v-for="game in visibleTrendingGames" :key="game.game_id + '-' + game.rank" @click="openGameModal(game.game_id, displayGameTitle(game))">
-                    <td style="width: 50px; text-align: center; font-weight: bold; font-size: 1.1rem;" :style="{ color: game.rank <= 3 ? 'red' : 'var(--text-light)' }">{{ game.rank }}</td>
-                    <td style="font-weight: bold; position: relative;">
-                      <transition name="ticker-slide" mode="out-in">
-                        <div :key="game.game_id" style="display: flex; align-items: center; gap: 8px; width: 100%;">
-                          <span>{{ displayGameTitle(game) }}</span>
-                          <span style="font-size: 0.85rem; color: var(--text-light); font-weight: normal;">
-                            <i class="fa-regular fa-eye"></i> {{ game.view_count || 0 }}
-                          </span>
-                        </div>
-                      </transition>
-                    </td>
-                    <td style="width: 50px; text-align: right; color: var(--text-light); padding-right: 20px; cursor: pointer;" @click.stop="showAllTrending = !showAllTrending">
-                      <i v-if="!showAllTrending || game.rank === 1" class="fa-solid" :class="showAllTrending ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+        <!-- 6. 순서 뽑기 -->
+        <div class="map-tile tile-tool-turn" @click="openToolModal('turn')">
+          <div class="tile-content tool-content">
+            <div class="tool-emoji">🪜</div>
+            <h3>순서 뽑기</h3>
           </div>
         </div>
 
@@ -936,8 +912,7 @@ function refreshRecommendations() {
   submitRecommend({ excludeCurrent: true })
 }
 
-function loadRecentRecommendations() {
-
+function loadRecentViewedGames() {
   try {
     recentViewedGames.value = JSON.parse(localStorage.getItem('recent_viewed_games') || '[]')
   } catch {

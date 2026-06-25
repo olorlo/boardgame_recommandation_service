@@ -1,49 +1,50 @@
 {% extends 'base.html' %}
 {% block content %}
 <section class="auth-page">
-    <div class="card profile-edit-card">
-        <h2>프로필 꾸미기</h2>
-        <p class="auth-subtitle">프로필 사진과 최애 보드게임을 설정해요.</p>
+    <div class="card auth-card" style="max-width: 450px; padding: 1.5rem 2rem;">
+        <div class="auth-icon" style="margin-bottom: 0.5rem; font-size: 2rem;"><i class="fa-solid fa-user-pen"></i></div>
+        <h2 style="font-size: 1.5rem; margin-bottom: 0.25rem;">프로필 꾸미기</h2>
+        <p class="auth-subtitle" style="margin-bottom: 0.5rem; font-size: 0.85rem;">프로필 사진과 최애 보드게임을 설정해요.</p>
 
-        <form action="{% url 'accounts:profile_edit' %}" method="POST" enctype="multipart/form-data" class="auth-form">
+        <form action="{% url 'accounts:profile_edit' %}" method="POST" enctype="multipart/form-data" class="auth-form" style="margin-top: 0;">
             {% csrf_token %}
             {% if form.non_field_errors %}
-                <div class="form-errors">{{ form.non_field_errors }}</div>
+                <div class="form-errors" style="font-size: 0.75rem;">{{ form.non_field_errors }}</div>
             {% endif %}
 
-            <div class="auth-field">
-                <label for="{{ form.profile_image.id_for_label }}">프로필 사진</label>
-                <div class="profile-image-editor">
-                    <div class="profile-avatar profile-avatar-preview">
+            <div class="auth-field" style="margin-bottom: 0.75rem;">
+                <label for="{{ form.profile_image.id_for_label }}" style="margin-bottom: 0.25rem; font-size: 0.85rem;">프로필 사진</label>
+                <div class="profile-image-editor" style="display: flex; gap: 15px; align-items: center; margin-bottom: 0.25rem;">
+                    <div class="profile-avatar profile-avatar-preview" style="font-size: 2.5rem; color: var(--primary-color);">
                         {% if user.profile_image %}
-                            <img src="{{ user.profile_image.url }}" alt="현재 프로필 사진">
+                            <img src="{{ user.profile_image.url }}" alt="현재 프로필 사진" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
                         {% else %}
-                            <span>{{ user.username|first|upper }}</span>
+                            <i class="fa-solid fa-circle-user"></i>
                         {% endif %}
                     </div>
-                    <div>
+                    <div style="flex: 1; font-size: 0.85rem;">
                         {{ form.profile_image }}
-                        <p class="profile-note">새 이미지를 선택한 뒤 저장하면 프로필에 반영돼요.</p>
                     </div>
                 </div>
+                <p class="auth-subtitle" style="text-align: left; margin-top: 0; margin-bottom: 0; font-size: 0.75rem;">새 이미지를 선택한 뒤 저장하면 프로필에 반영돼요.</p>
                 {% if form.profile_image.errors %}
-                    <div class="form-errors">{{ form.profile_image.errors }}</div>
+                    <div class="form-errors" style="font-size: 0.75rem;">{{ form.profile_image.errors }}</div>
                 {% endif %}
             </div>
 
-            <div class="auth-field">
-                <label for="{{ form.favorite_game_tags.id_for_label }}">최애 보드게임 태그</label>
+            <div class="auth-field" style="margin-bottom: 1rem;">
+                <label for="{{ form.favorite_game_tags.id_for_label }}" style="margin-bottom: 0.25rem; font-size: 0.85rem;">최애 보드게임 태그</label>
                 {{ form.favorite_game_tags }}
-                <p class="profile-note">띄어쓰기나 쉼표로 구분해서 최대 10개까지 입력해요. 예: #스플렌더 #카탄 #루미큐브</p>
-                <div class="tag-preview" id="tagPreview"></div>
+                <p class="auth-subtitle" style="text-align: left; margin-top: 0.25rem; margin-bottom: 0; font-size: 0.75rem;">띄어쓰기나 쉼표로 구분해서 최대 10개까지 입력해요. 예: #스플렌더 #카탄</p>
+                <div class="tag-preview" id="tagPreview" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 0.25rem; font-size: 0.8rem;"></div>
                 {% if form.favorite_game_tags.errors %}
-                    <div class="form-errors">{{ form.favorite_game_tags.errors }}</div>
+                    <div class="form-errors" style="font-size: 0.75rem;">{{ form.favorite_game_tags.errors }}</div>
                 {% endif %}
             </div>
 
-            <button type="submit" class="btn btn-yellow auth-submit">저장하기</button>
-            <a href="{% url 'accounts:profile' user.pk %}" class="auth-link">프로필로 돌아가기</a>
+            <button type="submit" class="btn btn-yellow auth-submit" style="padding: 0.5rem; font-size: 0.9rem;">저장하기</button>
         </form>
+        <a href="{% url 'accounts:profile' user.pk %}" class="auth-link" style="margin-top: 0.75rem; font-size: 0.85rem;">프로필로 돌아가기</a>
     </div>
 </section>
 
