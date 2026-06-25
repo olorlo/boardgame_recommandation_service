@@ -53,7 +53,7 @@
                 <i class="fa-solid fa-chevron-left"></i>
               </button>
               
-              <div class="carousel-item" @click="openAiRecommendModal(currentRecentGame.title)" style="flex: 1; height: 100%; display: flex; flex-direction: column; cursor: pointer; transition: transform 0.2s; overflow: hidden; padding: 10px; box-sizing: border-box;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+              <div class="carousel-item" @click="openAiRecommendModal(currentRecentGame.title, { imageUrl: currentRecentGame.imageUrl })" style="flex: 1; height: 100%; display: flex; flex-direction: column; cursor: pointer; transition: transform 0.2s; overflow: hidden; padding: 10px; box-sizing: border-box;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                 
                 <div class="carousel-image-container" style="flex: 1; min-height: 0; width: 100%; background-color: #f9f5ec; border-radius: 8px; display: flex; justify-content: center; align-items: center; overflow: hidden; margin-bottom: 8px;">
                   <img v-if="currentRecentGame.imageUrl" :src="currentRecentGame.imageUrl" alt="게임 썸네일" style="width: 100%; height: 100%; object-fit: contain;" />
@@ -104,10 +104,10 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="game in top5Games" :key="game.game_id" @click="openGameModal(game.game_id, game.title)" style="cursor: pointer;">
+                <tr v-for="game in top5Games" :key="game.game_id" @click="openGameModal(game.game_id, displayGameTitle(game))" style="cursor: pointer;">
                   <td style="text-align: center; font-weight: bold; padding: 8px 0;" :style="{ color: game.rank <= 3 ? 'red' : 'var(--text-light)' }">{{ game.rank }}</td>
                   <td style="font-weight: bold; padding: 8px 0;">
-                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; display: inline-block;">{{ game.title }}</span>
+                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; display: inline-block;">{{ displayGameTitle(game) }}</span>
                   </td>
                 </tr>
               </tbody>
@@ -116,35 +116,11 @@
           </div>
         </div>
 
-      <!-- Trending Section -->
-          <div class="trending-section" style="max-width: 800px; margin: 0 auto; text-align: left;">
-            <h3 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 10px; margin-bottom: 15px;">
-              <i class="fa-solid fa-fire" style="color: red;"></i> 실시간 많이 찾는 보드게임
-            </h3>
-
-            <div v-if="trendingLoading" style="text-align: center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> 불러오는 중...</div>
-            <div v-else class="card" style="padding: 0; overflow: hidden;">
-              <table class="games-table" style="margin: 0;">
-                <tbody>
-                  <tr v-for="game in visibleTrendingGames" :key="game.game_id + '-' + game.rank" @click="openGameModal(game.game_id, displayGameTitle(game))">
-                    <td style="width: 50px; text-align: center; font-weight: bold; font-size: 1.1rem;" :style="{ color: game.rank <= 3 ? 'red' : 'var(--text-light)' }">{{ game.rank }}</td>
-                    <td style="font-weight: bold; position: relative;">
-                      <transition name="ticker-slide" mode="out-in">
-                        <div :key="game.game_id" style="display: flex; align-items: center; gap: 8px; width: 100%;">
-                          <span>{{ displayGameTitle(game) }}</span>
-                          <span style="font-size: 0.85rem; color: var(--text-light); font-weight: normal;">
-                            <i class="fa-regular fa-eye"></i> {{ game.view_count || 0 }}
-                          </span>
-                        </div>
-                      </transition>
-                    </td>
-                    <td style="width: 50px; text-align: right; color: var(--text-light); padding-right: 20px; cursor: pointer;" @click.stop="showAllTrending = !showAllTrending">
-                      <i v-if="!showAllTrending || game.rank === 1" class="fa-solid" :class="showAllTrending ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+        <!-- 6. 순서 뽑기 -->
+        <div class="map-tile tile-tool-turn" @click="openToolModal('turn')">
+          <div class="tile-content tool-content">
+            <div class="tool-emoji">🎲</div>
+            <h3>순서 뽑기</h3>
           </div>
         </div>
 
@@ -296,7 +272,7 @@
             </div>
 
             <template v-else>
-              <div v-for="item in aiRecommendations" :key="item.game_id || item.title" class="card ai-item" @click="openAiRecommendModal(item.title, { displayTitle: displayGameTitle(item) })" style="margin: 0;">
+              <div v-for="item in aiRecommendations" :key="item.game_id || item.title" class="card ai-item" @click="openAiRecommendModal(item.title, { displayTitle: displayGameTitle(item), imageUrl: item.image_url })" style="margin: 0;">
                 <div class="ai-item-content" style="display: flex; gap: 15px; align-items: flex-start;">
                   <img v-if="item.image_url" :src="item.image_url" alt="board game cover" class="ai-item-image" />
                   <div class="ai-item-text" style="text-align: left;">
@@ -538,47 +514,74 @@
       </div>
       <div class="retro-content-inner" style="background:var(--bg-color); padding:1.5rem; text-align:center;">
         <div v-if="gameModal.loading" style="margin: 2rem 0;"><i class="fa-solid fa-spinner fa-spin"></i> 게임 정보를 불러오는 중...</div>
-        <div v-else style="text-align: left;">
-        <div class="detail-grid" style="margin-top: 20px;">
-          <div style="flex: 1;">
-            <div v-if="gameModal.details">
-              <h4>기본 정보</h4>
-              <p>인원: {{ gameModal.details.min_players }} ~ {{ gameModal.details.max_players }}명</p>
-              <p>시간: {{ gameModal.details.playing_time }}분</p>
-              <p>난이도: {{ Number(gameModal.details.weight).toFixed(1) }} / 5.0</p>
+        <div v-else class="game-detail-body">
+          <div class="modal-game-header">
+            <div class="modal-game-cover">
+              <img v-if="gameModal.imageUrl" :src="gameModal.imageUrl" :alt="`${modalFeedbackTitle} 표지`" />
+              <i v-else class="fa-solid fa-chess-board"></i>
             </div>
-
-            <h4 style="margin-top: 20px; color: var(--accent-color);">AI 룰 요약</h4>
-            <div style="background: var(--box-bg); padding: 10px; border-radius: 8px; font-size: 0.9rem; white-space: pre-line;">
-              <i v-if="gameModal.guideLoading" class="fa-solid fa-spinner fa-spin"></i>
-              {{ gameModal.summary || (gameModal.guideLoading ? '요약 중...' : '요약을 불러오지 못했습니다.') }}
+            <div class="modal-game-heading">
+              <span class="modal-game-kicker">게임 상세</span>
+              <h2>{{ modalFeedbackTitle }}</h2>
+              <div v-if="gameModal.details" class="modal-game-meta">
+                <span><i class="fa-solid fa-users"></i> {{ gameModal.details.min_players }}~{{ gameModal.details.max_players }}명</span>
+                <span><i class="fa-regular fa-clock"></i> {{ gameModal.details.playing_time }}분</span>
+                <span><i class="fa-solid fa-signal"></i> {{ Number(gameModal.details.weight).toFixed(1) }}</span>
+              </div>
             </div>
+            <button class="btn btn-outline modal-review-toggle" type="button" @click="openModalReview">
+              <i class="fa-regular fa-pen-to-square"></i>
+              리뷰
+            </button>
           </div>
-          <div style="flex: 1;">
-            <div class="modal-review-toggle-row">
-              <button class="btn btn-outline modal-review-toggle" type="button" @click="openModalReview">
-                <i class="fa-regular fa-pen-to-square"></i>
-                리뷰
-              </button>
-            </div>
-            <h4>유튜브 영상 (룰 가이드)</h4>
-            <div class="youtube-box">
-              <i v-if="gameModal.guideLoading" class="fa-solid fa-spinner fa-spin"></i>
-              <iframe
-                v-else-if="gameModal.youtubeVideoId"
-                width="100%"
-                height="100%"
-                :src="`https://www.youtube.com/embed/${gameModal.youtubeVideoId}`"
-                frameborder="0"
-                allowfullscreen
-                style="border-radius: 8px;"
-              ></iframe>
-              <span v-else>영상 없음</span>
-            </div>
-          </div>
-        </div>
 
-        <div class="community-share-box" style="margin-top: 20px; padding: 15px; background: var(--box-bg); border-radius: 8px;">
+          <div class="detail-grid guide-grid">
+            <section class="detail-section rule-section">
+              <h4 class="rule-summary-title">룰 요약</h4>
+              <div class="rule-summary-panel">
+                <i v-if="gameModal.guideLoading" class="fa-solid fa-spinner fa-spin"></i>
+                <template v-else-if="gameModal.ruleSummary">
+                  <div class="rule-theme-line">
+                    {{ gameModal.ruleSummary.theme_intro }}
+                  </div>
+                  <div class="rule-summary-row objective">
+                    <span class="rule-summary-label">목표</span>
+                    <strong>{{ gameModal.ruleSummary.objective }}</strong>
+                  </div>
+                  <div class="rule-summary-row">
+                    <span class="rule-summary-label">진행</span>
+                    <ol class="rule-flow-list">
+                      <li v-for="item in gameModal.ruleSummary.flow" :key="`flow-${item}`">{{ item }}</li>
+                    </ol>
+                  </div>
+                  <div class="rule-summary-row reason">
+                    <span class="rule-summary-label">추천</span>
+                    <span>{{ gameModal.ruleSummary.recommendation_reason }}</span>
+                  </div>
+                </template>
+                <span v-else>{{ gameModal.summary || '요약을 불러오지 못했습니다.' }}</span>
+              </div>
+            </section>
+
+            <section class="detail-section video-section">
+              <h4>유튜브 영상 (룰 가이드)</h4>
+              <div class="youtube-box">
+                <i v-if="gameModal.guideLoading" class="fa-solid fa-spinner fa-spin"></i>
+                <iframe
+                  v-else-if="gameModal.youtubeVideoId"
+                  width="100%"
+                  height="100%"
+                  :src="`https://www.youtube.com/embed/${gameModal.youtubeVideoId}`"
+                  frameborder="0"
+                  allowfullscreen
+                  style="border-radius: 8px;"
+                ></iframe>
+                <span v-else>영상 없음</span>
+              </div>
+            </section>
+          </div>
+
+        <div class="community-share-box" style="margin-top: 16px; padding: 15px; background: var(--box-bg); border-radius: 8px;">
           <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--primary-color);">낙서장에 공유하기</h4>
           <textarea v-model="gameModal.shareContent" class="input-field" placeholder="이 게임 어땠나요? 추천받은 소감이나 리뷰를 남겨보세요!" style="width: 100%; min-height: 80px; resize: vertical; margin-bottom: 10px;"></textarea>
           <div style="text-align: right;">
@@ -587,6 +590,39 @@
              </button>
           </div>
         </div>
+
+        <section class="detail-section game-reviews-section">
+          <div class="game-reviews-heading">
+            <h4>이 게임 리뷰</h4>
+            <button class="btn btn-outline review-refresh-btn" type="button" @click="fetchGameReviews()">
+              <i class="fa-solid fa-rotate-right"></i>
+              새로고침
+            </button>
+          </div>
+          <div v-if="gameModal.reviews.loading" class="game-reviews-empty">
+            <i class="fa-solid fa-spinner fa-spin"></i>
+            리뷰를 불러오는 중...
+          </div>
+          <div v-else-if="gameModal.reviews.error" class="game-reviews-empty">
+            {{ gameModal.reviews.error }}
+          </div>
+          <div v-else-if="gameModal.reviews.items.length" class="game-review-list">
+            <article v-for="review in gameModal.reviews.items" :key="review.id" class="game-review-card">
+              <div class="game-review-topline">
+                <strong>{{ review.username }}</strong>
+                <span>{{ review.created_at }}</span>
+              </div>
+              <div class="game-review-badges">
+                <span v-if="review.rating"><i class="fa-solid fa-star"></i> {{ review.rating }}점</span>
+                <span v-if="review.player_count"><i class="fa-solid fa-users"></i> {{ review.player_count }}명</span>
+              </div>
+              <p>{{ review.review }}</p>
+            </article>
+          </div>
+          <div v-else class="game-reviews-empty">
+            아직 모인 리뷰가 없습니다.
+          </div>
+        </section>
 
         </div>
       </div>
@@ -774,13 +810,21 @@ const gameModal = reactive({
   open: false,
   loading: false,
   guideLoading: false,
+  gameId: null,
   title: '',
   details: null,
+  imageUrl: '',
   summary: '',
+  ruleSummary: null,
   youtubeVideoId: '',
   shareContent: '',
   shareLoading: false,
-  reviewOpen: false
+  reviewOpen: false,
+  reviews: {
+    loading: false,
+    items: [],
+    error: ''
+  }
 })
 const modalFeedbackTitle = computed(() => gameModal.title.replace(' (AI 추천)', '').trim())
 const RECENT_RECOMMENDATIONS_KEY = 'boardgame_recent_recommendations'
@@ -788,6 +832,26 @@ const GAME_GUIDE_CACHE_KEY = 'boardgame_guide_cache'
 
 function displayGameTitle(item) {
   return item?.display_title || item?.korean_title || item?.title || ''
+}
+
+function detailImageUrl(details) {
+  return (
+    details?.image_url
+    || details?.thumbnail_url
+    || details?.boardgame?.thumbnail_url
+    || details?.boardgame?.image_url
+    || ''
+  )
+}
+
+function normalizeRuleSummary(value) {
+  if (!value || typeof value !== 'object') return null
+  return {
+    theme_intro: String(value.theme_intro || value.theme || '').trim(),
+    objective: String(value.objective || '').trim(),
+    flow: Array.isArray(value.flow) ? value.flow.filter(Boolean).map(String) : [],
+    recommendation_reason: String(value.recommendation_reason || value.reason || value.caution || '').trim(),
+  }
 }
 
 const wheelColors = ['#c45b4c', '#e0ac5f', '#5d3f2e', '#6e9f84', '#6f88b8', '#a491bc', '#d7837f']
@@ -1033,6 +1097,7 @@ async function saveRecommendationFeedback(item) {
 
     form.status = '저장됐어요. 프로필에서 다시 볼 수 있습니다.'
     form.review = ''
+    fetchGameReviews()
   } catch (error) {
     form.status = `오류: ${error.message}`
   } finally {
@@ -1328,15 +1393,18 @@ function ladderY(rowIndex) {
 
 async function openGameModal(gameId, title) {
   resetGameModal(title)
+  gameModal.gameId = gameId
   addRecentViewedGame(title)
   gameModal.loading = true
+  fetchGameReviews({ gameId, title })
 
   try {
     const response = await fetch(`/boardgames/api/${gameId}/details/`)
     if (!response.ok) throw new Error('Details not found')
     gameModal.details = await response.json()
     if (gameModal.details) {
-      updateRecentViewedGameImage(title, gameModal.details.image || gameModal.details.thumbnail || '')
+      gameModal.imageUrl = detailImageUrl(gameModal.details)
+      updateRecentViewedGameImage(title, gameModal.imageUrl)
     }
     gameModal.loading = false
     fetchGameSmartGuide(gameId)
@@ -1350,10 +1418,7 @@ async function fetchGameSmartGuide(gameId) {
   const cacheKey = guideIdKey(gameId)
   const cached = getCachedGuide(cacheKey)
   if (cached) {
-    gameModal.summary = cached.summary || ''
     gameModal.youtubeVideoId = cached.youtubeVideoId || ''
-    gameModal.guideLoading = false
-    return
   }
 
   gameModal.guideLoading = true
@@ -1361,9 +1426,9 @@ async function fetchGameSmartGuide(gameId) {
     const response = await fetch(`/boardgames/${gameId}/recommend/`)
     const data = await response.json()
     gameModal.summary = data.summary || ''
+    gameModal.ruleSummary = normalizeRuleSummary(data.rule_summary)
     gameModal.youtubeVideoId = data.youtube_videoId || ''
     setGuideCache(cacheKey, {
-      summary: gameModal.summary,
       youtubeVideoId: gameModal.youtubeVideoId
     })
   } finally {
@@ -1374,9 +1439,9 @@ async function fetchGameSmartGuide(gameId) {
 async function openAiRecommendModal(title, options = {}) {
 
   const modalTitle = options.displayTitle || title
-  resetGameModal(`${modalTitle} (AI 추천)`)
+  resetGameModal(`${modalTitle} (AI 추천)`, options.imageUrl || '')
   
-  addRecentViewedGame(title)
+  addRecentViewedGame(modalTitle)
 
   gameModal.loading = true
   gameModal.guideLoading = true
@@ -1386,27 +1451,32 @@ async function openAiRecommendModal(title, options = {}) {
     const cached = getCachedGuide(cacheKey)
     if (cached) {
       gameModal.details = cached.details || null
-      gameModal.summary = cached.summary || ''
+      gameModal.imageUrl = detailImageUrl(gameModal.details) || gameModal.imageUrl
       gameModal.youtubeVideoId = cached.youtubeVideoId || ''
-      return
     }
 
     const response = await fetch(`/boardgames/api/details_by_title/?title=${encodeURIComponent(title)}`)
     const data = await response.json()
     gameModal.details = data.details || null
     gameModal.summary = data.ai_summary || ''
+    gameModal.ruleSummary = normalizeRuleSummary(data.rule_summary)
     gameModal.youtubeVideoId = data.youtube_videoId || ''
     if (gameModal.details) {
-      updateRecentViewedGameImage(title, gameModal.details.image || gameModal.details.thumbnail || '')
+      gameModal.imageUrl = detailImageUrl(gameModal.details) || gameModal.imageUrl
+      gameModal.gameId = gameModal.details.boardgame?.game_id || null
+      updateRecentViewedGameImage(modalTitle, gameModal.imageUrl)
     }
     setGuideCache(cacheKey, {
       details: gameModal.details,
-      summary: gameModal.summary,
       youtubeVideoId: gameModal.youtubeVideoId
     })
   } finally {
     gameModal.loading = false
     gameModal.guideLoading = false
+    fetchGameReviews({
+      gameId: gameModal.gameId,
+      title: modalFeedbackTitle.value
+    })
     if (options.openReview) {
       gameModal.reviewOpen = true
     }
@@ -1458,15 +1528,54 @@ function closeGameDetail() {
   gameModal.open = false
 }
 
-function resetGameModal(title) {
+async function fetchGameReviews(options = {}) {
+  const gameId = options.gameId ?? gameModal.gameId
+  const title = options.title || modalFeedbackTitle.value
+  const params = new URLSearchParams()
+
+  if (gameId) {
+    params.set('game_id', gameId)
+  } else if (title) {
+    params.set('title', title)
+  } else {
+    return
+  }
+
+  gameModal.reviews.loading = true
+  gameModal.reviews.error = ''
+
+  try {
+    const response = await fetch(`/boardgames/api/recommendation-reviews/?${params.toString()}`, {
+      credentials: 'same-origin'
+    })
+    const data = await response.json()
+    if (!response.ok || data.status !== 'success') {
+      gameModal.reviews.error = data.message || '리뷰를 불러오지 못했습니다.'
+      return
+    }
+    gameModal.reviews.items = Array.isArray(data.reviews) ? data.reviews : []
+  } catch (error) {
+    gameModal.reviews.error = `리뷰를 불러오지 못했습니다: ${error.message}`
+  } finally {
+    gameModal.reviews.loading = false
+  }
+}
+
+function resetGameModal(title, imageUrl = '') {
   gameModal.open = true
+  gameModal.gameId = null
   gameModal.title = title
   gameModal.details = null
+  gameModal.imageUrl = imageUrl
   gameModal.summary = ''
+  gameModal.ruleSummary = null
   gameModal.youtubeVideoId = ''
   gameModal.shareContent = `#${modalFeedbackTitle.value} `
   gameModal.shareLoading = false
   gameModal.reviewOpen = false
+  gameModal.reviews.loading = false
+  gameModal.reviews.items = []
+  gameModal.reviews.error = ''
   ensureFeedbackForm(modalFeedbackTitle.value)
 }
 </script>

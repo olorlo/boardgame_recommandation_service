@@ -128,6 +128,12 @@ class Command(BaseCommand):
             response = requests.get(url, headers=headers, timeout=15)
             last_response = response
 
+            if response.status_code == 401 and headers:
+                self.stdout.write(
+                    self.style.WARNING("BGG token was rejected. Retrying without Authorization header.")
+                )
+                headers = {}
+                continue
             if response.status_code == 202:
                 time.sleep(max(2, sleep_seconds))
                 continue

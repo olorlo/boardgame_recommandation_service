@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
-BGG_TOKEN = env("BGG_TOKEN", default="")
+BGG_TOKEN = env("BGG_TOKEN", default=env("BGG_KEY", default=""))
 #----------------------------
 
 

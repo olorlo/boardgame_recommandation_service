@@ -24,6 +24,17 @@ class GameDetails(models.Model):
     weight = models.FloatField()
 
 
+class RuleSummary(models.Model):
+    boardgame = models.OneToOneField(BoardGames, on_delete=models.CASCADE, related_name='rule_summary')
+    summary = models.TextField()
+    source = models.CharField(max_length=50, default='ai_bgg_context')
+    source_url = models.URLField(blank=True)
+    model_name = models.CharField(max_length=80, blank=True)
+    is_verified = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
 class RecommendationFeedback(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='recommendation_feedbacks')
     boardgame = models.ForeignKey(BoardGames, on_delete=models.SET_NULL, null=True, blank=True, related_name='recommendation_feedbacks')

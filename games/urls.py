@@ -9,6 +9,7 @@ urlpatterns = [
     path('api/details_by_title/', views.details_by_title, name='api_details_by_title'),
     path('api/top/', views.top_boardgame, name='api_top_boardgame'),
     path('api/recommendation-feedback/', views.recommendation_feedback, name='api_recommendation_feedback'),
+    path('api/recommendation-reviews/', views.recommendation_reviews, name='api_recommendation_reviews'),
     path('api/trending/', views.trending_boardgames, name='api_trending_boardgames'),
     
     # HTML & AJAX routes
