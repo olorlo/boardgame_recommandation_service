@@ -168,7 +168,119 @@ def _candidate_sort_key(detail, difficulty, preference):
     return rank, weight
 
 
-def _build_recommend_candidates(players, time, difficulty, preference, exclude_game_ids=None, limit=60, rank_limit=3000):
+def _feedback_weight(feedback):
+    if feedback.rating is None:
+        return 0
+    return feedback.rating - 3
+
+
+def _user_recommendation_profile(user):
+    if not getattr(user, 'is_authenticated', False):
+        return None
+
+    feedbacks = list(
+        RecommendationFeedback.objects
+        .select_related('boardgame')
+        .filter(user=user, boardgame__isnull=False)
+        .order_by('-created_at')[:80]
+    )
+    if not feedbacks:
+        return None
+
+    liked = [item for item in feedbacks if item.rating and item.rating >= 4]
+    disliked = [item for item in feedbacks if item.rating and item.rating <= 2]
+    weighted_details = []
+    liked_titles = []
+    disliked_titles = []
+
+    for feedback in feedbacks:
+        weight = _feedback_weight(feedback)
+        details = GameDetails.objects.filter(boardgame=feedback.boardgame).first()
+        if weight > 0:
+            liked_titles.append(_game_display_title(feedback.boardgame))
+        elif weight < 0:
+            disliked_titles.append(_game_display_title(feedback.boardgame))
+        if details and weight:
+            weighted_details.append((details, weight))
+
+    def weighted_average(getter):
+        total_weight = sum(abs(weight) for _, weight in weighted_details if weight > 0)
+        if total_weight <= 0:
+            return None
+        return sum(getter(detail) * weight for detail, weight in weighted_details if weight > 0) / total_weight
+
+    return {
+        'reviewed_ids': {item.boardgame_id for item in feedbacks if item.boardgame_id},
+        'liked_ids': {item.boardgame_id for item in liked if item.boardgame_id},
+        'disliked_ids': {item.boardgame_id for item in disliked if item.boardgame_id},
+        'preferred_weight': weighted_average(lambda detail: detail.weight or 0),
+        'preferred_time': weighted_average(lambda detail: detail.playing_time or 0),
+        'preferred_players': weighted_average(lambda detail: (detail.min_players + detail.max_players) / 2),
+        'liked_titles': liked_titles[:5],
+        'disliked_titles': disliked_titles[:5],
+    }
+
+
+def _closeness_bonus(value, target, tolerance):
+    if target is None or value is None:
+        return 0
+    distance = abs(value - target)
+    return max(0, 1 - (distance / tolerance))
+
+
+def _candidate_personal_score(detail, profile):
+    if not profile:
+        return 0
+
+    score = 0
+    game_id = detail.boardgame.game_id
+    if game_id in profile['liked_ids']:
+        score += 1.5
+    if game_id in profile['disliked_ids']:
+        score -= 5
+
+    score += _closeness_bonus(detail.weight, profile.get('preferred_weight'), 1.0) * 1.4
+    score += _closeness_bonus(detail.playing_time, profile.get('preferred_time'), 45) * 0.8
+    score += _closeness_bonus(
+        (detail.min_players + detail.max_players) / 2,
+        profile.get('preferred_players'),
+        3,
+    ) * 0.8
+    return score
+
+
+def _candidate_trend_score(detail):
+    view_count = detail.boardgame.view_count or 0
+    if view_count <= 0:
+        return 0
+    return min(view_count, 50) / 50
+
+
+def _combined_candidate_sort_key(detail, difficulty, preference, profile):
+    base_key = _candidate_sort_key(detail, difficulty, preference)
+    personal_score = _candidate_personal_score(detail, profile)
+    trend_score = _candidate_trend_score(detail)
+    return (-(personal_score + trend_score * 0.9),) + tuple(base_key)
+
+
+def _personalization_prompt(profile):
+    if not profile:
+        return "로그인 사용자의 누적 리뷰 데이터가 아직 부족합니다."
+
+    liked = ', '.join(profile['liked_titles']) or '없음'
+    disliked = ', '.join(profile['disliked_titles']) or '없음'
+    details = []
+    if profile.get('preferred_weight') is not None:
+        details.append(f"선호 난이도 평균 {profile['preferred_weight']:.1f}")
+    if profile.get('preferred_time') is not None:
+        details.append(f"선호 시간 평균 {profile['preferred_time']:.0f}분")
+    if profile.get('preferred_players') is not None:
+        details.append(f"선호 인원 중심 {profile['preferred_players']:.1f}명")
+    detail_text = ', '.join(details) or '선호 통계 부족'
+    return f"좋게 평가한 게임: {liked}. 낮게 평가한 게임: {disliked}. {detail_text}."
+
+
+def _build_recommend_candidates(players, time, difficulty, preference, exclude_game_ids=None, limit=60, rank_limit=3000, profile=None):
     base = (
         GameDetails.objects
         .select_related('boardgame')
@@ -180,10 +292,13 @@ def _build_recommend_candidates(players, time, difficulty, preference, exclude_g
     player_range = _parse_player_range(players)
     time_range = _parse_time_range(time)
     excluded_ids = set(exclude_game_ids or [])
+    if profile:
+        excluded_ids.update(profile.get('reviewed_ids') or set())
+        excluded_ids.update(profile.get('disliked_ids') or set())
     candidates_by_id = {}
 
     def add_candidates(queryset):
-        for detail in sorted(queryset[:300], key=lambda item: _candidate_sort_key(item, difficulty, preference)):
+        for detail in sorted(queryset[:300], key=lambda item: _combined_candidate_sort_key(item, difficulty, preference, profile)):
             game_id = detail.boardgame.game_id
             if game_id in excluded_ids or game_id in candidates_by_id:
                 continue
@@ -652,12 +767,16 @@ def situation_recommend(request):
         if ai_comment:
             situation = f"{situation}, 추가 요청: {ai_comment[:500]}"
 
+        profile = _user_recommendation_profile(request.user)
+        personalization_text = _personalization_prompt(profile)
+
         candidates = _build_recommend_candidates(
             players,
             time,
             difficulty,
             preference,
             exclude_game_ids=exclude_game_ids,
+            profile=profile,
         )
         if not candidates:
             return JsonResponse({
@@ -672,7 +791,9 @@ def situation_recommend(request):
                 f"시간 {detail.playing_time}분 | 긱 웨이트 {detail.weight:.2f} | "
                 f"BGG rank {detail.boardgame.rank} | "
                 f"party rank {detail.boardgame.party_rank or '없음'} | "
-                f"family rank {detail.boardgame.family_rank or '없음'}"
+                f"family rank {detail.boardgame.family_rank or '없음'} | "
+                f"site views {detail.boardgame.view_count or 0} | "
+                f"user affinity {_candidate_personal_score(detail, profile):.2f}"
             )
             for detail in candidates
         ]
@@ -687,6 +808,7 @@ def situation_recommend(request):
 제공된 후보 목록은 서버가 인원, 시간, 난이도로 이미 검증한 게임입니다.
 반드시 후보 목록 안의 game_id만 골라야 합니다. 후보 밖 게임, 모르는 게임, 새 제목을 절대 만들지 마세요.
 특히 초보자는 BoardGameGeek weight 2.0 초과를 어렵게 느낄 수 있으니, 쉬움/초보 조건에서는 더 낮은 weight를 우선하세요.
+사용자 리뷰 경향과 사이트 조회수는 보조 신호입니다. 입력 조건을 먼저 만족시키고, 동률이면 user affinity와 site views가 높은 후보를 더 선호하세요.
 인사말이나 설명 문장 없이 JSON 배열만 출력하세요."""
 
             user_prompt = f"""[검증된 후보 목록]
@@ -695,8 +817,11 @@ def situation_recommend(request):
 [사용자 조건]
 {situation}
 
+[사용자 누적 리뷰 경향]
+{personalization_text}
+
 후보 중 조건에 가장 잘 맞는 게임을 최대 3개까지 골라 주세요.
-추천 이유에는 왜 인원/시간/난이도 조건에 맞는지와 사용자의 추가 요청을 어떻게 반영했는지 짧게 포함하세요.
+추천 이유에는 왜 인원/시간/난이도 조건에 맞는지, 사용자의 누적 리뷰 경향 또는 사이트 인기 신호를 어떻게 참고했는지 짧게 포함하세요.
 포맷: [{{"game_id": 123, "reason": "..."}}]"""
 
             payload = {
