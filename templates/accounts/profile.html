@@ -1,103 +1,106 @@
 {% extends 'base.html' %}
 {% block content %}
-<section class="auth-page" style="padding: 2rem 1rem; align-items: flex-start; height: auto; min-height: 100vh;">
-    <div class="card auth-card" style="max-width: 500px; padding: 1.5rem 2rem; margin: 0 auto; width: 100%;">
-        <div class="profile-top" style="margin-bottom: 1rem; text-align: center;">
-            <div class="profile-avatar" style="margin-bottom: 0.5rem; font-size: 2.5rem; color: var(--primary-color); display: inline-block; position: relative;">
-                {% if person.profile_image %}
-                    <img id="avatarPreview" src="{{ person.profile_image.url }}" alt="{{ person.username }} 프로필 사진" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--accent-color);">
-                {% else %}
-                    <i id="avatarPreviewIcon" class="fa-solid fa-circle-user" style="font-size: 80px;"></i>
+<section class="auth-page" style="padding: 2rem 1rem; align-items: flex-start; display: flex; justify-content: center; min-height: 0;">
+    <div class="card auth-card" style="max-width: 1200px; padding: 1.5rem 2rem; margin: 0 auto; margin-bottom: 0; width: 100%; display: grid; grid-template-columns: 280px 1fr 1fr; gap: 2rem; align-items: start; box-sizing: border-box;">
+        
+        <!-- Column 1: Profile Info & Favorite Games -->
+        <div class="profile-col-1" style="display: flex; flex-direction: column; gap: 1rem; overflow-y: auto;" class="custom-scrollbar">
+            <div>
+                <div class="profile-top" style="margin-bottom: 1rem; text-align: center;">
+                    <div class="profile-avatar" style="margin-bottom: 0.5rem; font-size: 2.5rem; color: var(--primary-color); display: inline-block; position: relative;">
+                        {% if person.profile_image %}
+                            <img id="avatarPreview" src="{{ person.profile_image.url }}" alt="{{ person.username }} 프로필사진" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--accent-color);">
+                        {% else %}
+                            <i id="avatarPreviewIcon" class="fa-solid fa-circle-user" style="font-size: 80px;"></i>
+                        {% endif %}
+                    </div>
+                    <div class="profile-title">
+                        <h2 style="font-size: 1.5rem; margin-bottom: 0.25rem;">{{ person.username }}님의 프로필</h2>
+                        <p class="auth-subtitle" style="margin-bottom: 0.5rem; font-size: 0.85rem;">
+                            <i class="fa-regular fa-calendar"></i> 가입일: {{ person.date_joined|date:"Y.m.d" }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="profile-stats" style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem; padding: 0.75rem; background: #fafafa; border: 1px dashed #ccc;">
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                        <strong id="followersCount" style="font-size: 1.25rem; color: var(--accent-color);">{{ person.followers.all|length }}</strong>
+                        <span class="auth-subtitle" style="font-weight: bold; font-size: 0.75rem; margin: 0;">팔로워</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                        <strong id="followingsCount" style="font-size: 1.25rem; color: var(--accent-color);">{{ person.followings.all|length }}</strong>
+                        <span class="auth-subtitle" style="font-weight: bold; font-size: 0.75rem; margin: 0;">팔로잉</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                        <strong style="font-size: 1.25rem; color: var(--accent-color);">{{ articles|length }}</strong>
+                        <span class="auth-subtitle" style="font-weight: bold; font-size: 0.75rem; margin: 0;">낙서</span>
+                    </div>
+                </div>
+
+                {% if is_owner %}
+                <div class="profile-actions" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 1.5rem;">
+                    <a href="{% url 'accounts:profile_edit' %}" class="btn btn-yellow" style="padding: 0.5rem 1rem; font-size: 0.85rem; width: 100%; box-sizing: border-box; text-align: center;"><i class="fa-solid fa-user-pen"></i> 정보 수정</a>
+                    <a href="{% url 'accounts:account_settings' %}" class="btn std-btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem; width: 100%; box-sizing: border-box; text-align: center;"><i class="fa-solid fa-gear"></i> 계정 관리</a>
+                </div>
+                {% elif user.is_authenticated %}
+                <form id="followForm" data-user-id="{{ person.pk }}" style="margin-bottom: 1.5rem;">
+                    {% csrf_token %}
+                    <button type="submit" id="followBtn" class="btn {% if not user in person.followers.all %}btn-brown{% endif %}" style="width: 100%; padding: 0.5rem; font-size: 0.9rem;">
+                        {% if user in person.followers.all %}언팔로우{% else %}팔로우{% endif %}
+                    </button>
+                </form>
                 {% endif %}
             </div>
-            <div class="profile-title">
-                <h2 style="font-size: 1.5rem; margin-bottom: 0.25rem;">{{ person.username }}님의 프로필</h2>
-                <p class="auth-subtitle" style="margin-bottom: 0.5rem; font-size: 0.85rem;">
-                    <i class="fa-regular fa-calendar"></i> 가입일: {{ person.date_joined|date:"Y.m.d" }}
-                </p>
+
+            <!-- Favorite Game at bottom of Col 1 -->
+            <div style="text-align: left; margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #ccc;">
+                <h3 style="font-size: 1rem; color: #5bc0de; margin-bottom: 0.5rem;"><i class="fa-solid fa-dice"></i> 최애 보드게임</h3>
+                {% if person.favorite_game_tag_list %}
+                    <div class="favorite-game-list" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                        {% for tag in person.favorite_game_tag_list %}
+                            <span style="font-size: 0.8rem; padding: 2px 8px; border: 1px solid #5bc0de; color: #5bc0de; background: #fff;">#{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="auth-subtitle" style="font-size: 0.8rem;">아직 등록된 최애 보드게임이 없습니다.</p>
+                {% endif %}
             </div>
         </div>
 
-        <div class="profile-stats" style="display: flex; justify-content: center; gap: 2rem; margin-bottom: 1rem; padding: 0.75rem; background: #fafafa; border-radius: 8px; border: 1px dashed #ccc;">
-            <div style="display: flex; flex-direction: column; align-items: center;">
-                <strong id="followersCount" style="font-size: 1.25rem; color: var(--accent-color);">{{ person.followers.all|length }}</strong>
-                <span class="auth-subtitle" style="font-weight: bold; font-size: 0.75rem; margin: 0;">팔로워</span>
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: center;">
-                <strong id="followingsCount" style="font-size: 1.25rem; color: var(--accent-color);">{{ person.followings.all|length }}</strong>
-                <span class="auth-subtitle" style="font-weight: bold; font-size: 0.75rem; margin: 0;">팔로잉</span>
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: center;">
-                <strong style="font-size: 1.25rem; color: var(--accent-color);">{{ articles|length }}</strong>
-                <span class="auth-subtitle" style="font-weight: bold; font-size: 0.75rem; margin: 0;">낙서</span>
-            </div>
-        </div>
-
-        {% if is_owner %}
-        <div class="profile-actions" style="display: flex; justify-content: center; gap: 10px; margin-bottom: 1.5rem;">
-            <a href="{% url 'accounts:profile_edit' %}" class="btn btn-yellow" style="padding: 0.5rem 1rem; font-size: 0.85rem;"><i class="fa-solid fa-user-pen"></i> 정보 수정</a>
-            <a href="{% url 'accounts:account_settings' %}" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem; border: 2px solid var(--border-color); background: #fff;"><i class="fa-solid fa-gear"></i> 계정 관리</a>
-        </div>
-        {% elif user.is_authenticated %}
-        <form id="followForm" data-user-id="{{ person.pk }}" style="margin-bottom: 1.5rem;">
-            {% csrf_token %}
-            <button type="submit" id="followBtn" class="btn {% if not user in person.followers.all %}btn-brown{% endif %}" style="width: 100%; padding: 0.5rem; font-size: 0.9rem;">
-                {% if user in person.followers.all %}언팔로우{% else %}팔로우{% endif %}
-            </button>
-        </form>
-        {% endif %}
-
-        <hr style="margin: 1rem 0; border: none; border-top: 1px dashed #ccc;">
-
-        <div style="text-align: left; margin-bottom: 1.5rem;">
-            <h3 style="font-size: 1.1rem; color: #5bc0de; margin-bottom: 0.5rem;"><i class="fa-solid fa-dice"></i> 최애 보드게임</h3>
-            {% if person.favorite_game_tag_list %}
-                <div class="favorite-game-list" style="display: flex; flex-wrap: wrap; gap: 6px;">
-                    {% for tag in person.favorite_game_tag_list %}
-                        <span style="font-size: 0.8rem; padding: 2px 8px; border-radius: 12px; border: 1px solid #5bc0de; color: #5bc0de; background: #fff;">#{{ tag }}</span>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <p class="auth-subtitle" style="font-size: 0.8rem; text-align: center;">아직 등록한 최애 보드게임 태그가 없습니다.</p>
-            {% endif %}
-        </div>
-
-        <hr style="margin: 1rem 0; border: none; border-top: 1px dashed #ccc;">
-
-        <div style="text-align: left; margin-bottom: 1.5rem;">
-            <h3 style="font-size: 1.1rem; color: #d9534f; margin-bottom: 0.5rem;"><i class="fa-solid fa-pencil"></i> 내가 쓴 낙서</h3>
-            {% if articles %}
-                <div class="profile-article-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <!-- Column 2: My Doodles -->
+        <div class="profile-col-2" style="display: flex; flex-direction: column; border-left: 1px solid #eadecc; padding-left: 2rem;">
+            <h3 style="font-size: 1.1rem; color: #d9534f; margin-bottom: 1rem; flex-shrink: 0;"><i class="fa-solid fa-pencil"></i> 내가 쓴 낙서</h3>
+            <div class="profile-article-list custom-scrollbar" style="max-height: 400px; overflow-y: auto; padding-right: 10px; display: flex; flex-direction: column; gap: 0.75rem;">
+                {% if articles %}
                     {% for article in articles %}
-                        <article style="padding: 0.75rem; background: #fff; border: 1px solid #eadecc; border-radius: 8px;">
+                        <article style="padding: 0.75rem; background: #fff; border: 1px solid #eadecc; flex-shrink: 0;">
                             <p style="font-size: 0.9rem; margin-bottom: 0.5rem; color: #333;">{{ article.content }}</p>
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <span style="font-size: 0.75rem; color: #888;">{{ article.created_at|date:"Y.m.d H:i" }}</span>
                                 {% if is_owner %}
-                                    <a href="{% url 'community:update' article.pk %}" style="font-size: 0.75rem; color: #d9534f; font-weight: bold; text-decoration: none;">수정</a>
+                                    <button onclick="openEditModal('{{ article.pk }}', '{{ article.content|escapejs }}')" style="background: none; border: none; font-size: 0.75rem; color: #d9534f; font-weight: bold; cursor: pointer; padding: 0;">수정</button>
                                 {% endif %}
                             </div>
                         </article>
                     {% endfor %}
-                </div>
-            {% else %}
-                <p class="auth-subtitle" style="font-size: 0.8rem; text-align: center;">아직 작성한 낙서가 없습니다.</p>
-            {% endif %}
+                {% else %}
+                    <p class="auth-subtitle" style="font-size: 0.8rem; text-align: center; margin-top: 2rem;">아직 작성한 낙서가 없습니다.</p>
+                {% endif %}
+            </div>
         </div>
 
-        <hr style="margin: 1rem 0; border: none; border-top: 1px dashed #ccc;">
-
-        <div style="text-align: left;">
-            <h3 style="font-size: 1.1rem; color: #5cb85c; margin-bottom: 0.5rem;"><i class="fa-solid fa-star"></i> 추천 리뷰</h3>
-            {% if recommendation_feedbacks %}
-                <div class="profile-article-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <!-- Column 3: Recommended Reviews -->
+        <div class="profile-col-3" style="display: flex; flex-direction: column; border-left: 1px solid #eadecc; padding-left: 2rem;">
+            <h3 style="font-size: 1.1rem; color: #5cb85c; margin-bottom: 1rem; flex-shrink: 0;"><i class="fa-solid fa-star"></i> 추천 리뷰</h3>
+            <div class="profile-article-list custom-scrollbar" style="max-height: 400px; overflow-y: auto; padding-right: 10px; display: flex; flex-direction: column; gap: 0.75rem;">
+                {% if recommendation_feedbacks %}
                     {% for feedback in recommendation_feedbacks %}
-                        <article style="padding: 0.75rem; background: #fff; border: 1px solid #eadecc; border-radius: 8px;">
+                        <article style="padding: 0.75rem; background: #fff; border: 1px solid #eadecc; flex-shrink: 0;">
                             <p style="font-size: 0.95rem; font-weight: bold; margin-bottom: 0.25rem; color: #333;">
                                 {{ feedback.game_title }}
                                 <span style="font-size: 0.75rem; font-weight: normal; color: #888;">
                                     {% if feedback.rating %} · 별점 {{ feedback.rating }}/5{% endif %}
-                                    {% if feedback.player_count %} · {{ feedback.player_count }}명{% endif %}
+                                    {% if feedback.player_count %} · {{ feedback.player_count }}인{% endif %}
                                 </span>
                             </p>
                             {% if feedback.review %}
@@ -109,53 +112,13 @@
                             </div>
                         </article>
                     {% endfor %}
-                </div>
-            {% else %}
-                <p class="auth-subtitle" style="font-size: 0.8rem; text-align: center;">아직 저장한 추천 리뷰가 없습니다.</p>
-            {% endif %}
+                {% else %}
+                    <p class="auth-subtitle" style="font-size: 0.8rem; text-align: center; margin-top: 2rem;">아직 작성한 추천 리뷰가 없습니다.</p>
+                {% endif %}
+            </div>
         </div>
+        
     </div>
 </section>
 
-<script>
-    const form = document.querySelector('#followForm')
-    if (form) {
-        form.addEventListener('submit', function (event) {
-            event.preventDefault()
-            const userId = event.target.dataset.userId
-            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value
-
-            fetch(`/accounts/${userId}/follow/`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrftoken,
-                }
-            })
-            .then(response => {
-                if(!response.ok) throw new Error('Request failed');
-                return response.json();
-            })
-            .then(data => {
-                const followBtn = document.querySelector('#followBtn')
-                const followersCount = document.querySelector('#followersCount')
-                const followingsCount = document.querySelector('#followingsCount')
-
-                if (data.is_followed) {
-                    followBtn.textContent = '언팔로우'
-                    followBtn.className = 'std-btn'
-                } else {
-                    followBtn.textContent = '팔로우'
-                    followBtn.className = 'std-btn std-btn-primary'
-                }
-
-                followersCount.textContent = data.followers_count
-                followingsCount.textContent = data.followings_count
-            })
-            .catch(error => {
-                console.error(error);
-                alert("오류가 발생했습니다.");
-            })
-        })
-    }
-</script>
 {% endblock %}

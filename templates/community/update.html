@@ -1,18 +1,22 @@
 {% extends 'base.html' %}
 {% block content %}
-<div style="margin-bottom: 2rem;">
-    <h2>낙서 수정하기</h2>
-    <p class="subtitle">뭐라고 썼었더라 🖍️</p>
-</div>
-
-<div class="card" style="margin-bottom: 2rem; text-align: left;">
-    <form action="{% url 'community:update' article.pk %}" method="POST" style="display:flex; gap:10px;">
-        {% csrf_token %}
-        <input type="text" name="content" class="input-field" style="margin-bottom:0;" value="{{ article.content }}" required>
-        <button type="submit" class="btn btn-yellow" style="width:auto; min-width:120px; padding:0 1.5rem; margin:0;"><i class="fa-solid fa-pencil"></i> 수정</button>
-    </form>
-</div>
-<div style="text-align:center;">
-    <a href="{% url 'community:index' %}" style="color:var(--text-light);"><i class="fa-solid fa-arrow-left"></i> 돌아가기</a>
+<div class="std-page-container" style="max-width: 600px; margin: 4rem auto; width: 100%;">
+    <div class="std-card" style="text-align: left;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h3 class="std-section-title" style="margin-bottom: 0; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-pencil" style="color: var(--accent-color);"></i> 낙서 수정하기
+            </h3>
+        </div>
+        <form action="{% url 'community:update' article.pk %}" method="POST" class="modal-compose-form">
+            {% csrf_token %}
+            <textarea name="content" class="std-input" placeholder="오늘 게임 어땠나요? 재미있는 이야기를 자유롭게 남겨보세요! 🖍️" required style="min-height: 180px; padding: 1.5rem; text-align: left; resize: vertical; line-height: 1.6; font-family: inherit;">{{ article.content }}</textarea>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 1rem;">
+                <a href="{% url 'community:index' %}" class="std-btn" style="text-decoration: none; padding: 0.5rem 1rem; color: inherit;">취소</a>
+                <button type="submit" class="std-btn std-btn-primary">
+                    <i class="fa-solid fa-pencil"></i> 수정
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 {% endblock %}

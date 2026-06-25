@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="std-page-container" style="max-width: 1200px; margin: 0 auto;">
+<div class="std-page-container" style="max-width: 1200px; margin: 0 auto; width: 100%;">
 <section class="page-header" style="text-align: center;">
     <h2 class="std-page-title">낙서장</h2>
     <p class="std-body std-subtext">보드게임 이야기를 가볍게 남겨보세요.</p>
@@ -17,13 +17,13 @@
 <!-- Actions Bar (Search + Compose Button) -->
 <section class="community-actions-bar" style="display: flex; flex-wrap: nowrap; gap: 1rem; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 2rem;">
     <div class="actions-left-search" style="flex: 1; min-width: 0;">
-        <form action="{% url 'community:index' %}" method="GET" class="search-form" style="display: flex; gap: 8px; align-items: center;">
-            <input type="text" name="q" value="{{ query }}" placeholder="글 내용/작성자 검색" class="std-input" style="margin-bottom: 0; padding: 0.4rem 0.6rem; font-size: 0.85rem; max-width: 250px;">
-            <button type="submit" class="std-btn" style="white-space: nowrap; padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+        <form action="{% url 'community:index' %}" method="GET" class="search-form" style="display: flex; gap: 8px; align-items: stretch; width: 100%; max-width: 600px;">
+            <input type="text" name="q" value="{{ query }}" placeholder="글 내용/작성자 검색" class="std-input" style="margin-bottom: 0; padding: 0.6rem 1rem; font-size: 1rem; flex: 1;">
+            <button type="submit" class="std-btn std-btn-primary" style="white-space: nowrap; padding: 0.6rem 1.2rem; font-size: 1rem; display: flex; align-items: center; gap: 6px;">
                 <i class="fa-solid fa-magnifying-glass"></i> 검색
             </button>
             {% if query %}
-            <a href="{% url 'community:index' %}" class="std-btn" style="white-space: nowrap; padding: 0.4rem 0.8rem; font-size: 0.85rem;">초기화</a>
+            <a href="{% url 'community:index' %}" class="std-btn" style="white-space: nowrap; padding: 0.6rem 1.2rem; font-size: 1rem; display: flex; align-items: center;">초기화</a>
             {% endif %}
         </form>
     </div>
@@ -41,11 +41,73 @@
     </div>
 </section>
 
-<section class="retro-note-grid" id="communityNoteGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem;">
+<style>
+.retro-note-card {
+    box-sizing: border-box;
+    padding: 1rem !important;
+    height: auto !important;
+    min-height: 240px !important;
+    text-align: left !important;
+}
+.path-right::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: -1.5rem;
+    width: 1.5rem;
+    border-top: 4px dashed var(--primary-color);
+    z-index: -1;
+}
+.path-left::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -1.5rem;
+    width: 1.5rem;
+    border-top: 4px dashed var(--primary-color);
+    z-index: -1;
+}
+.path-down-right::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: -1.5rem;
+    width: 1.5rem;
+    height: calc(100% + 2rem);
+    border-top: 4px dashed var(--primary-color);
+    border-right: 4px dashed var(--primary-color);
+    border-bottom: 4px dashed var(--primary-color);
+    border-radius: 0 20px 20px 0;
+    z-index: -1;
+}
+.path-down-left::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -1.5rem;
+    width: 1.5rem;
+    height: calc(100% + 2rem);
+    border-top: 4px dashed var(--primary-color);
+    border-left: 4px dashed var(--primary-color);
+    border-bottom: 4px dashed var(--primary-color);
+    border-radius: 20px 0 0 20px;
+    z-index: -1;
+}
+.path-down-single::after {
+    content: '';
+    position: absolute;
+    bottom: -2rem;
+    left: 50%;
+    height: 2rem;
+    border-left: 4px dashed var(--primary-color);
+    z-index: -1;
+}
+</style>
+<section class="retro-note-grid" id="communityNoteGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 2rem 1.5rem; width: 100%;">
     {% for article in articles %}
     <article class="retro-note-card note-card-item" id="note-card-{{ forloop.counter0 }}" {% if forloop.counter0 >= 16 %}style="display: none;"{% endif %}>
         <!-- Header -->
-        <div class="note-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <div class="note-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
             <div class="note-author std-card-title" style="margin-bottom: 0; font-size: 0.9rem; flex: 1;">
                 <i class="fa-solid fa-user-astronaut"></i>
                 <a href="{% url 'accounts:profile' article.user.pk %}" style="color: inherit; text-decoration: none; margin-right: 8px;">{{ article.user.username }}</a>
@@ -53,7 +115,7 @@
             </div>
             {% if user == article.user %}
             <div class="note-actions" style="white-space: nowrap;">
-                <a href="{% url 'community:update' article.pk %}" aria-label="수정" style="color: var(--text-light); margin-right: 8px; font-size: 0.85rem;"><i class="fa-solid fa-pen"></i></a>
+                <button onclick="openEditModal('{{ article.pk }}', '{{ article.content|escapejs }}')" aria-label="수정" style="background: none; border: none; color: var(--text-light); cursor: pointer; margin-right: 8px; font-size: 0.85rem; padding: 0;"><i class="fa-solid fa-pen"></i></button>
                 <form action="{% url 'community:delete' article.pk %}" method="POST" style="display: inline;">
                     {% csrf_token %}
                     <button type="submit" aria-label="삭제" style="background: none; border: none; color: var(--text-light); cursor: pointer; font-size: 0.85rem; padding: 0;"><i class="fa-solid fa-trash"></i></button>
@@ -63,53 +125,52 @@
         </div>
 
         <!-- Content -->
-        <div class="note-body" style="flex: 1; overflow: hidden; margin-bottom: 0.5rem;">
-            <p style="font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; font-weight: 500; font-size: 0.95rem; line-height: 1.5; margin: 0; white-space: pre-wrap; word-break: break-all; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis;">{{ article.content }}</p>
+        <div class="note-body" style="flex: 1; overflow: hidden; margin-bottom: 0.25rem;">
+            <p style="font-weight: 500; font-size: 0.95rem; line-height: 1.5; margin: 0; white-space: pre-wrap; word-break: break-all; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; text-align: left;">{{ article.content }}</p>
         </div>
 
-        <!-- Tags -->
-        {% if article.tags.all %}
-        <div class="note-tags" style="margin-bottom: 0.5rem;">
-            {% for tag in article.tags.all %}
-            <a href="{% url 'community:index' %}?tag={{ tag.name|urlencode }}" class="std-tag" style="font-size: 0.75rem; padding: 2px 6px;">#{{ tag.name }}</a>
-            {% endfor %}
-        </div>
-        {% endif %}
-
-        <!-- Hearts -->
-        <div class="note-footer" style="border-top: 2px dashed #eadecc; padding-top: 0.4rem; display: flex; align-items: center; margin-bottom: 0.4rem;">
-            <div class="note-like">
+        <!-- Tags & Likes Bar -->
+        <div class="note-meta-bar" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #eadecc; padding-bottom: 0.25rem; margin-bottom: 0.25rem;">
+            <div class="note-tags" style="display: flex; gap: 4px; flex-wrap: wrap;">
+                {% if article.tags.all %}
+                    {% for tag in article.tags.all %}
+                    <a href="{% url 'community:index' %}?tag={{ tag.name|urlencode }}" class="std-tag" style="font-size: 0.7rem; padding: 2px 4px;">#{{ tag.name }}</a>
+                    {% endfor %}
+                {% endif %}
+            </div>
+            
+            <div class="note-like" style="white-space: nowrap; margin-left: 8px;">
                 {% if user.is_authenticated %}
-                <form class="like-forms" data-article-id="{{ article.pk }}">
+                <form class="like-forms" data-article-id="{{ article.pk }}" style="margin: 0;">
                     {% csrf_token %}
-                    <button type="submit" style="background: none; border: none; font-size: 1rem; color: var(--accent-color); cursor: pointer; padding: 0;">
+                    <button type="submit" style="background: none; border: none; font-size: 0.9rem; color: var(--accent-color); cursor: pointer; padding: 0; display: flex; align-items: center; gap: 3px;">
                         {% if user in article.like_users.all %}
                             <i class="fa-solid fa-heart" id="like-icon-{{ article.pk }}"></i>
                         {% else %}
                             <i class="fa-regular fa-heart" id="like-icon-{{ article.pk }}"></i>
                         {% endif %}
-                        <span id="like-count-{{ article.pk }}" style="font-size: 0.9rem;">{{ article.like_users.all|length }}</span>
+                        <span id="like-count-{{ article.pk }}" style="font-size: 0.8rem; font-weight: bold;">{{ article.like_users.all|length }}</span>
                     </button>
                 </form>
                 {% else %}
-                    <span style="font-size: 1rem; color: var(--accent-color);"><i class="fa-solid fa-heart"></i> <span style="font-size: 0.9rem;">{{ article.like_users.all|length }}</span></span>
+                    <span style="font-size: 0.9rem; color: var(--accent-color); display: flex; align-items: center; gap: 3px;"><i class="fa-solid fa-heart"></i> <span style="font-size: 0.8rem; font-weight: bold;">{{ article.like_users.all|length }}</span></span>
                 {% endif %}
             </div>
         </div>
 
         <!-- Replies -->
-        <div class="note-comments-section" style="background: var(--box-bg); padding: 0.5rem; border: 2px inset #eadecc; height: 90px; display: flex; flex-direction: column;">
-            <div class="comments-list" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.5rem; padding-right: 5px;">
+        <div class="note-comments-section" style="background: transparent; padding: 0; display: flex; flex-direction: column;">
+            <div class="comments-list" style="overflow-y: auto; max-height: 60px; display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.25rem; padding-right: 2px;">
                 {% for comment in article.comments.all %}
                 <div class="comment-item" style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div class="comment-bubble" style="flex: 1; word-break: break-all; font-size: 0.8rem; line-height: 1.2;">
+                    <div class="comment-bubble" style="flex: 1; word-break: break-all; font-size: 0.75rem; line-height: 1.2;">
                         <span class="comment-author" style="font-weight: bold; margin-right: 4px;"><a href="{% url 'accounts:profile' comment.user.pk %}" style="color: var(--primary-color); text-decoration: none;">{{ comment.user.username }}</a></span>
                         <span style="color: #333;">{{ comment.content }}</span>
                     </div>
                     {% if user == comment.user %}
                     <form action="{% url 'community:comment_delete' article.pk comment.pk %}" method="POST" style="display: inline; margin-left: 5px;">
                         {% csrf_token %}
-                        <button type="submit" style="background: none; border: none; color: var(--accent-color); cursor: pointer; padding: 0; font-size: 0.75rem;" aria-label="삭제"><i class="fa-solid fa-xmark"></i></button>
+                        <button type="submit" style="background: none; border: none; color: var(--accent-color); cursor: pointer; padding: 0; font-size: 0.7rem;" aria-label="삭제"><i class="fa-solid fa-xmark"></i></button>
                     </form>
                     {% endif %}
                 </div>
@@ -117,10 +178,10 @@
             </div>
 
             {% if user.is_authenticated %}
-            <form action="{% url 'community:comment_create' article.pk %}" method="POST" class="comment-form" style="display: flex; gap: 5px;">
+            <form action="{% url 'community:comment_create' article.pk %}" method="POST" class="comment-form" style="display: flex; gap: 4px; align-items: stretch;">
                 {% csrf_token %}
-                <input type="text" name="content" placeholder="답글..." required style="flex: 1; padding: 0.2rem 0.4rem; font-size: 0.75rem; border: 2px inset #eadecc; margin: 0; outline: none;">
-                <button type="submit" class="std-btn std-btn-primary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">등록</button>
+                <input type="text" name="content" placeholder="댓글..." required style="flex: 1; padding: 0.3rem 0.5rem; font-size: 0.75rem; border: 1px solid #ccc; border-radius: 0; background: rgba(255,255,255,0.7); margin: 0; outline: none; box-sizing: border-box;">
+                <button type="submit" class="std-btn std-btn-primary" style="padding: 0 1rem; font-size: 0.75rem; line-height: normal; min-width: 60px; white-space: nowrap; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-width: 2px;">등록</button>
             </form>
             {% endif %}
         </div>
@@ -151,7 +212,7 @@
         </div>
         <form action="{% url 'community:create' %}" method="POST" class="modal-compose-form">
             {% csrf_token %}
-            <textarea name="content" class="std-input" placeholder="오늘 게임 어땠나요? 재미있는 이야기를 자유롭게 남겨보세요! 🖍️" required style="min-height: 120px; resize: vertical;"></textarea>
+            <textarea name="content" class="std-input" placeholder="오늘 게임 어땠나요? 재미있는 이야기를 자유롭게 남겨보세요! 🖍️" required style="min-height: 180px; padding: 1.5rem; text-align: left; resize: vertical; line-height: 1.6;"></textarea>
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 1rem;">
                 <button type="button" class="std-btn" onclick="closeComposeModal()">취소</button>
                 <button type="submit" class="std-btn std-btn-primary">
@@ -162,7 +223,66 @@
     </div>
 </div>
 
+<!-- Edit Modal Overlay -->
+<div class="modal-overlay" id="editModal" style="display: none;">
+    <div class="modal-content std-card" style="max-width: 500px; text-align: left;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h3 class="std-section-title" style="margin-bottom: 0; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-pen" style="color: var(--accent-color);"></i> 낙서 수정하기
+            </h3>
+            <span class="modal-close" onclick="closeEditModal()" style="font-size: 1.5rem; cursor: pointer; color: var(--text-light);">&times;</span>
+        </div>
+        <form id="editModalForm" onsubmit="submitEditModal(event)" class="modal-compose-form">
+            {% csrf_token %}
+            <textarea id="editModalContent" name="content" class="std-input" required style="min-height: 180px; padding: 1.5rem; text-align: left; resize: vertical; line-height: 1.6;"></textarea>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 1rem;">
+                <button type="button" class="std-btn" onclick="closeEditModal()">취소</button>
+                <button type="submit" class="std-btn std-btn-primary">
+                    <i class="fa-regular fa-paper-plane"></i> 수정 완료
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
+    let currentEditPk = null;
+
+    function openEditModal(pk, content) {
+        currentEditPk = pk;
+        document.getElementById('editModalContent').value = content;
+        document.getElementById('editModal').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeEditModal() {
+        document.getElementById('editModal').style.display = 'none';
+        document.body.style.overflow = '';
+        currentEditPk = null;
+    }
+
+    function submitEditModal(event) {
+        event.preventDefault();
+        if (!currentEditPk) return;
+        
+        const form = document.getElementById('editModalForm');
+        const formData = new FormData(form);
+        const csrftoken = form.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        fetch(`/community/${currentEditPk}/update/`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        }).then(() => {
+            window.location.reload();
+        }).catch(err => {
+            console.error('Error updating doodle:', err);
+            window.location.reload();
+        });
+    }
+
     const likeForms = document.querySelectorAll('.like-forms')
 
     likeForms.forEach((form) => {
@@ -226,7 +346,7 @@
         let newlyShown = 0;
         
         for (let i = currentVisibleCount; i < items.length && newlyShown < 16; i++) {
-            items[i].style.display = 'inline-block';
+            items[i].style.display = 'flex';
             newlyShown++;
         }
         
@@ -238,6 +358,81 @@
                 btnContainer.style.display = 'none';
             }
         }
+        updateBoardGamePath();
     }
+
+    function updateBoardGamePath() {
+        const grid = document.getElementById('communityNoteGrid');
+        if (!grid) return;
+        const items = Array.from(document.querySelectorAll('.note-card-item')).filter(item => item.style.display !== 'none');
+        if (items.length === 0) return;
+        
+        // Reset order and classes to measure natural layout
+        items.forEach(item => {
+            item.style.gridRow = 'auto';
+            item.style.gridColumn = 'auto';
+            item.style.order = 0;
+            item.classList.remove('path-right', 'path-left', 'path-down-right', 'path-down-left', 'path-end', 'path-down-single');
+        });
+        
+        let columns = 1;
+        const firstTop = items[0].offsetTop;
+        for (let i = 1; i < items.length; i++) {
+            if (items[i].offsetTop === firstTop) {
+                columns++;
+            } else {
+                break;
+            }
+        }
+        
+        // If only 1 column, we don't need zigzag path
+        if (columns === 1) {
+            for (let i = 0; i < items.length; i++) {
+                if (i !== items.length - 1) {
+                    items[i].classList.add('path-down-single');
+                }
+            }
+            return;
+        }
+        
+        for (let i = 0; i < items.length; i++) {
+            const row = Math.floor(i / columns);
+            const col = i % columns;
+            
+            items[i].style.gridRow = row + 1;
+
+            if (row % 2 === 1) {
+                items[i].style.gridColumn = columns - col;
+            } else {
+                items[i].style.gridColumn = col + 1;
+            }
+            
+            const isLastItem = (i === items.length - 1);
+            if (isLastItem) {
+                items[i].classList.add('path-end');
+                continue;
+            }
+            
+            const isLastInRow = (col === columns - 1);
+            
+            if (row % 2 === 0) {
+                if (isLastInRow) {
+                    items[i].classList.add('path-down-right');
+                } else {
+                    items[i].classList.add('path-right');
+                }
+            } else {
+                if (isLastInRow) {
+                    items[i].classList.add('path-down-left');
+                } else {
+                    items[i].classList.add('path-left');
+                }
+            }
+        }
+    }
+
+    // Initialize board game path on load and update on resize
+    window.addEventListener('load', updateBoardGamePath);
+    window.addEventListener('resize', updateBoardGamePath);
 </script>
 {% endblock %}
