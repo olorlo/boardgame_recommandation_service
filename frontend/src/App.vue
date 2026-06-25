@@ -230,7 +230,7 @@
           </div>
           <div>
             <label style="font-weight: bold; font-size: 0.9rem;">테마</label>
-            <input v-model="recommendModal.params.theme" class="input-field" placeholder="예: 좀비, 판타지, 방탈출..." style="margin-bottom: 0;" @keyup.enter="submitRecommend" />
+            <input v-model="recommendModal.params.theme" class="input-field" placeholder="예: 농사, 좀비, 판타지, 방탈출, 우주, 기차..." style="margin-bottom: 0;" @keyup.enter="submitRecommend" />
           </div>
         </div>
 
@@ -693,7 +693,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import BoardBackground from './components/BoardBackground.vue'
 import TitleAnimation from './components/TitleAnimation.vue'
 
@@ -727,13 +727,11 @@ const top5Games = computed(() => {
 
 const rankingModalOpen = ref(false)
 const rankingSearchQuery = ref('')
+let rankingSearchTimer = null
 
 const filteredRankings = computed(() => {
   const startRank = (rankingPage.value - 1) * rankingPageSize
-  const list = trendingGames.value.map((game, i) => ({ ...game, rank: startRank + i + 1 }))
-  const query = rankingSearchQuery.value.trim().toLowerCase()
-  if (!query) return list
-  return list.filter(game => rankingSearchText(game).includes(query))
+  return trendingGames.value.map((game, i) => ({ ...game, rank: startRank + i + 1 }))
 })
 
 const rankingPageStart = computed(() => {
@@ -800,6 +798,7 @@ const recommendationSituation = computed(() => {
 const aiLoading = ref(false)
 const aiError = ref('')
 const aiRecommendations = ref([])
+const recommendationSeenGameIds = ref([])
 const recentViewedGames = ref([])
 const currentRecentIndex = ref(0)
 const currentRecentGame = computed(() => recentViewedGames.value[currentRecentIndex.value] || null)
@@ -903,14 +902,6 @@ function hasDetailStats(details) {
   )
 }
 
-function rankingSearchText(game) {
-  return [
-    displayGameTitle(game),
-    game?.korean_title,
-    game?.title
-  ].filter(Boolean).join(' ').toLowerCase()
-}
-
 function detailImageUrl(details) {
   return (
     details?.image_url
@@ -997,6 +988,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (tickerInterval) clearInterval(tickerInterval)
+  if (rankingSearchTimer) clearTimeout(rankingSearchTimer)
 })
 
 function showMain() {
@@ -1023,10 +1015,14 @@ async function fetchTrendingGames(page = rankingPage.value) {
       page: String(page),
       page_size: String(rankingPageSize)
     })
+    const query = rankingSearchQuery.value.trim()
+    if (query) {
+      params.set('q', query)
+    }
     const response = await fetch(`/boardgames/api/trending/?${params.toString()}`)
     const data = await response.json()
     trendingGames.value = data.games || []
-    if (Number(data.page || page) === 1) {
+    if (!query && Number(data.page || page) === 1) {
       topRankingGames.value = data.games || []
     }
     rankingPage.value = data.page || page
@@ -1039,10 +1035,29 @@ async function fetchTrendingGames(page = rankingPage.value) {
   }
 }
 
+watch(rankingSearchQuery, () => {
+  if (!rankingModalOpen.value) return
+  if (rankingSearchTimer) {
+    clearTimeout(rankingSearchTimer)
+  }
+  rankingSearchTimer = setTimeout(() => {
+    fetchTrendingGames(1)
+  }, 250)
+})
+
 async function submitRecommend(options = {}) {
   const excludeCurrent = options && options.excludeCurrent === true
+  const currentIds = aiRecommendations.value.map((item) => item.game_id).filter(Boolean)
+  if (!excludeCurrent) {
+    recommendationSeenGameIds.value = []
+  } else {
+    recommendationSeenGameIds.value = Array.from(new Set([
+      ...recommendationSeenGameIds.value,
+      ...currentIds
+    ]))
+  }
   const excludeGameIds = excludeCurrent
-    ? aiRecommendations.value.map((item) => item.game_id).filter(Boolean)
+    ? recommendationSeenGameIds.value
     : []
 
   aiLoading.value = true
@@ -1073,6 +1088,10 @@ async function submitRecommend(options = {}) {
       return
     }
     aiRecommendations.value = data.recommendations || []
+    recommendationSeenGameIds.value = Array.from(new Set([
+      ...recommendationSeenGameIds.value,
+      ...aiRecommendations.value.map((item) => item.game_id).filter(Boolean)
+    ]))
     aiRecommendations.value.forEach((item) => ensureFeedbackForm(item.title))
     recommendModal.step = 2
   } catch (error) {

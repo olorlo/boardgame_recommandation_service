@@ -256,11 +256,119 @@ def _candidate_trend_score(detail):
     return min(view_count, 50) / 50
 
 
-def _combined_candidate_sort_key(detail, difficulty, preference, profile):
+THEME_KEYWORD_ALIASES = {
+    '농사': [
+        '농사', '농장', '농부', '수확', '작물', '목장', '포도', '와인',
+        'farm', 'farmer', 'farming', 'harvest', 'agricola', 'caverna',
+        'viticulture', 'vineyard', 'wine', 'fields of arle', 'hallertau',
+        'atiwa', 'la granja', 'orchard',
+        '아그리콜라', '카베르나', '비티컬처', '하베스트', '라 그랑하', '할러타우', '아티와',
+    ],
+    '좀비': ['좀비', 'zombie', 'zombies', '언데드', 'undead'],
+    '판타지': ['판타지', 'fantasy', '마법', 'magic', 'wizard', 'dragon', '드래곤', 'dungeon', '던전'],
+    '방탈출': ['방탈출', 'escape', 'unlock', 'exit', 'deckscape', 'mystery', '미스터리'],
+    '우주': ['우주', 'space', 'mars', 'galaxy', 'planet', 'terraforming', '화성', '은하'],
+    '동물': ['동물', 'animal', 'animals', 'zoo', 'bird', 'wing', 'cat', 'dog', 'ark', '동물원'],
+    '기차': ['기차', '철도', 'rail', 'railroad', 'train', 'ticket to ride', 'steam'],
+    '문명': ['문명', 'civilization', 'civ', 'empire', 'through the ages', 'history'],
+    '추리': ['추리', '수사', '탐정', 'detective', 'crime', 'clue', 'deception', 'mystery'],
+    '전쟁': ['전쟁', '전투', 'war', 'battle', 'conflict', 'axis', 'allies'],
+    '경제': ['경제', '무역', '상인', '시장', 'money', 'market', 'trade', 'merchant', 'stock'],
+    '도시': ['도시', '건설', 'city', 'building', 'castle', 'palace', 'rome'],
+    '해적': ['해적', 'pirate', 'sea', 'ocean', 'ship', 'island'],
+}
+
+PREFERENCE_KEYWORD_ALIASES = {
+    '파티': ['party', '파티', '퀴즈', '그림', '단어', 'word', 'code', 'codenames', 'dixit', 'just one', '텔레스트레이션'],
+    '마피아': ['mafia', '마피아', 'bluff', '블러핑', 'deception', 'secret', 'hidden role', 'avalon', 'resistance', 'werewolf'],
+    '협력': ['cooperative', '협력', 'coop', 'crew', 'pandemic', 'spirit island', 'forbidden', 'zombicide', 'unlock', 'escape'],
+    '전략': ['strategy', '전략', 'terraforming', 'brass', 'gaia', 'terra', 'barrage', 'ark nova', 'dune', 'agricola'],
+}
+
+
+def _theme_terms(theme):
+    theme_text = _choice(theme, '').lower()
+    if not theme_text:
+        return []
+
+    terms = set(re.findall(r'[0-9a-zA-Z가-힣]+', theme_text))
+    for keyword, aliases in THEME_KEYWORD_ALIASES.items():
+        if keyword in theme_text or any(alias in theme_text for alias in aliases):
+            terms.update(alias.lower() for alias in aliases)
+    return [term for term in terms if len(term) >= 2]
+
+
+def _alias_terms(value, aliases_by_key):
+    text = _choice(value, '').lower()
+    if not text:
+        return []
+
+    terms = set(re.findall(r'[0-9a-zA-Z가-힣]+', text))
+    for keyword, aliases in aliases_by_key.items():
+        if keyword in text or any(alias in text for alias in aliases):
+            terms.update(alias.lower() for alias in aliases)
+    return [term for term in terms if len(term) >= 2]
+
+
+def _title_keyword_score(detail, terms):
+    if not terms:
+        return 0
+
+    game = detail.boardgame
+    haystack = ' '.join([
+        game.title or '',
+        game.korean_title or '',
+    ]).lower()
+
+    score = 0
+    for term in terms:
+        if term and term in haystack:
+            score += 3
+    return min(score, 9)
+
+
+def _candidate_theme_score(detail, theme):
+    return _title_keyword_score(detail, _theme_terms(theme))
+
+
+def _candidate_preference_score(detail, preference):
+    preference_text = _choice(preference, '')
+    terms = _alias_terms(preference_text, PREFERENCE_KEYWORD_ALIASES)
+    score = _title_keyword_score(detail, terms)
+    party_rank = _rank_signal(detail.boardgame.party_rank)
+    family_rank = _rank_signal(detail.boardgame.family_rank)
+    weight = detail.weight or 0
+
+    if any(keyword in preference_text for keyword in ['파티', '시끌']):
+        if party_rank < 999999:
+            score += 4
+    if any(keyword in preference_text for keyword in ['마피아', '블러핑']):
+        if party_rank < 999999:
+            score += 3
+    if '전략' in preference_text:
+        if weight >= 2.2:
+            score += min(3, (weight - 2.0) * 1.5)
+
+    return min(score, 10)
+
+
+def _combined_candidate_sort_key(detail, difficulty, preference, profile, theme):
     base_key = _candidate_sort_key(detail, difficulty, preference)
+    theme_score = _candidate_theme_score(detail, theme)
+    preference_score = _candidate_preference_score(detail, preference)
     personal_score = _candidate_personal_score(detail, profile)
     trend_score = _candidate_trend_score(detail)
-    return (-(personal_score + trend_score * 0.9),) + tuple(base_key)
+    rank = detail.boardgame.rank or 999999
+    rank_bucket = rank // 250
+    theme_group = 0 if _theme_terms(theme) and theme_score > 0 else 1
+    preference_group = 0 if _alias_terms(preference, PREFERENCE_KEYWORD_ALIASES) and preference_score > 0 else 1
+    return (
+        theme_group,
+        preference_group,
+        rank_bucket,
+        -(preference_score * 1.2 + personal_score * 0.8 + trend_score * 0.6),
+        rank,
+    ) + tuple(base_key)
 
 
 def _personalization_prompt(profile):
@@ -280,7 +388,7 @@ def _personalization_prompt(profile):
     return f"좋게 평가한 게임: {liked}. 낮게 평가한 게임: {disliked}. {detail_text}."
 
 
-def _build_recommend_candidates(players, time, difficulty, preference, exclude_game_ids=None, limit=60, rank_limit=3000, profile=None):
+def _build_recommend_candidates(players, time, difficulty, preference, theme=None, exclude_game_ids=None, limit=60, rank_limit=3000, profile=None):
     base = (
         GameDetails.objects
         .select_related('boardgame')
@@ -296,9 +404,10 @@ def _build_recommend_candidates(players, time, difficulty, preference, exclude_g
         excluded_ids.update(profile.get('reviewed_ids') or set())
         excluded_ids.update(profile.get('disliked_ids') or set())
     candidates_by_id = {}
+    window_size = 3000 if _theme_terms(theme) or _alias_terms(preference, PREFERENCE_KEYWORD_ALIASES) else 300
 
     def add_candidates(queryset):
-        for detail in sorted(queryset[:300], key=lambda item: _combined_candidate_sort_key(item, difficulty, preference, profile)):
+        for detail in sorted(queryset[:window_size], key=lambda item: _combined_candidate_sort_key(item, difficulty, preference, profile, theme)):
             game_id = detail.boardgame.game_id
             if game_id in excluded_ids or game_id in candidates_by_id:
                 continue
@@ -775,6 +884,7 @@ def situation_recommend(request):
             time,
             difficulty,
             preference,
+            theme=theme,
             exclude_game_ids=exclude_game_ids,
             profile=profile,
         )
@@ -792,6 +902,8 @@ def situation_recommend(request):
                 f"BGG rank {detail.boardgame.rank} | "
                 f"party rank {detail.boardgame.party_rank or '없음'} | "
                 f"family rank {detail.boardgame.family_rank or '없음'} | "
+                f"theme affinity {_candidate_theme_score(detail, theme):.2f} | "
+                f"preference affinity {_candidate_preference_score(detail, preference):.2f} | "
                 f"site views {detail.boardgame.view_count or 0} | "
                 f"user affinity {_candidate_personal_score(detail, profile):.2f}"
             )
@@ -808,6 +920,10 @@ def situation_recommend(request):
 제공된 후보 목록은 서버가 인원, 시간, 난이도로 이미 검증한 게임입니다.
 반드시 후보 목록 안의 game_id만 골라야 합니다. 후보 밖 게임, 모르는 게임, 새 제목을 절대 만들지 마세요.
 특히 초보자는 BoardGameGeek weight 2.0 초과를 어렵게 느낄 수 있으니, 쉬움/초보 조건에서는 더 낮은 weight를 우선하세요.
+사용자가 테마를 입력했다면 theme affinity가 높은 후보를 강하게 우선하세요. 테마와 무관한 유명 게임을 고르지 마세요.
+사용자가 성향을 선택했다면 preference affinity와 party/family rank를 함께 보고 성향에 맞는 후보를 우선하세요.
+MBTI는 보조 성향으로만 사용하세요. E/I는 상호작용 강도, N/S는 테마 몰입과 직관성, T/F는 경쟁/최적화와 협력/분위기, J/P는 계획성과 즉흥성을 판단하는 참고 신호입니다.
+인원, 시간, 난이도, 테마, 성향 조건을 MBTI보다 우선하세요.
 사용자 리뷰 경향과 사이트 조회수는 보조 신호입니다. 입력 조건을 먼저 만족시키고, 동률이면 user affinity와 site views가 높은 후보를 더 선호하세요.
 인사말이나 설명 문장 없이 JSON 배열만 출력하세요."""
 
@@ -822,6 +938,7 @@ def situation_recommend(request):
 
 후보 중 조건에 가장 잘 맞는 게임을 최대 3개까지 골라 주세요.
 추천 이유에는 왜 인원/시간/난이도 조건에 맞는지, 사용자의 누적 리뷰 경향 또는 사이트 인기 신호를 어떻게 참고했는지 짧게 포함하세요.
+MBTI가 추천 판단에 도움이 된 경우에만 한 문장 안에서 자연스럽게 반영하고, MBTI만으로 후보를 바꾸지 마세요.
 포맷: [{{"game_id": 123, "reason": "..."}}]"""
 
             payload = {
@@ -1069,7 +1186,14 @@ def trending_boardgames(request):
         page_size = 50
     page_size = max(1, min(page_size, 100))
 
-    queryset = BoardGames.objects.filter(rank__gt=0, rank__lte=3000).order_by('-view_count', 'rank')
+    search_query = str(request.GET.get('q', '') or '').strip()
+    queryset = BoardGames.objects.filter(rank__gt=0, rank__lte=3000)
+    if search_query:
+        queryset = queryset.filter(
+            Q(title__icontains=search_query) |
+            Q(korean_title__icontains=search_query)
+        )
+    queryset = queryset.order_by('-view_count', 'rank')
     total_count = queryset.count()
     total_pages = max(1, (total_count + page_size - 1) // page_size)
     page = min(page, total_pages)
