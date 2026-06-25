@@ -1,65 +1,68 @@
 {% extends 'base.html' %}
 {% block content %}
-<section class="settings-layout">
-    <div class="card settings-card">
-        <h2>계정 관리</h2>
-        <p class="auth-subtitle">아이디, 비밀번호, 회원탈퇴를 관리해요.</p>
+<section class="auth-page">
+    <div class="card auth-card" style="max-width: 450px; padding: 1.5rem 2rem;">
+        <div class="auth-icon" style="margin-bottom: 0.5rem; font-size: 2rem;"><i class="fa-solid fa-gear"></i></div>
+        <h2 style="font-size: 1.5rem; margin-bottom: 0.25rem;">계정 관리</h2>
+        <p class="auth-subtitle" style="margin-bottom: 0.5rem; font-size: 0.85rem;">아이디, 비밀번호, 회원탈퇴를 관리해요.</p>
 
-        <form action="{% url 'accounts:account_settings' %}" method="POST" class="auth-form settings-form">
+        <!-- 아이디 수정 -->
+        <form action="{% url 'accounts:account_settings' %}" method="POST" class="auth-form" style="margin-top: 0;">
             {% csrf_token %}
             <input type="hidden" name="action" value="account">
-            <h3>아이디 수정</h3>
-            <div class="auth-field">
-                <label for="{{ account_form.username.id_for_label }}">아이디</label>
+            <div class="auth-field" style="margin-bottom: 0.5rem;">
+                <label for="{{ account_form.username.id_for_label }}" style="margin-bottom: 0.25rem; font-size: 0.85rem;">아이디</label>
                 {{ account_form.username }}
                 {% if account_form.username.errors %}
-                    <div class="form-errors">{{ account_form.username.errors }}</div>
+                    <div class="form-errors" style="font-size: 0.75rem;">{{ account_form.username.errors }}</div>
                 {% endif %}
             </div>
-            <button type="submit" class="btn btn-yellow auth-submit">아이디 저장</button>
+            <button type="submit" class="btn btn-yellow auth-submit" style="padding: 0.5rem; font-size: 0.9rem;">아이디 저장</button>
         </form>
-    </div>
 
-    <div class="card settings-card">
-        <form action="{% url 'accounts:account_settings' %}" method="POST" class="auth-form settings-form">
+        <hr style="margin: 0.75rem 0; border: none; border-top: 1px dashed #ccc;">
+
+        <!-- 비밀번호 변경 -->
+        <form action="{% url 'accounts:account_settings' %}" method="POST" class="auth-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="password">
-            <h3>비밀번호 변경</h3>
+            <h3 style="margin-bottom: 0.5rem; color: #444; font-size: 1rem; text-align: center;">비밀번호 변경</h3>
             {% if password_form.non_field_errors %}
-                <div class="form-errors">{{ password_form.non_field_errors }}</div>
+                <div class="form-errors" style="font-size: 0.75rem;">{{ password_form.non_field_errors }}</div>
             {% endif %}
             {% for field in password_form %}
-                <div class="auth-field">
-                    <label for="{{ field.id_for_label }}">
+                <div class="auth-field" style="margin-bottom: 0.5rem;">
+                    <label for="{{ field.id_for_label }}" style="margin-bottom: 0.25rem; font-size: 0.85rem;">
                         {% if field.name == 'old_password' %}현재 비밀번호{% elif field.name == 'new_password1' %}새 비밀번호{% else %}새 비밀번호 확인{% endif %}
                     </label>
                     {{ field }}
                     {% if field.errors %}
-                        <div class="form-errors">{{ field.errors }}</div>
+                        <div class="form-errors" style="font-size: 0.75rem;">{{ field.errors }}</div>
                     {% endif %}
                 </div>
             {% endfor %}
-            <button type="submit" class="btn btn-brown auth-submit">비밀번호 변경</button>
+            <button type="submit" class="btn btn-brown auth-submit" style="padding: 0.5rem; font-size: 0.9rem;">비밀번호 변경</button>
         </form>
-    </div>
 
-    <div class="card settings-card danger-card">
-        <form action="{% url 'accounts:account_settings' %}" method="POST" class="auth-form settings-form">
+        <hr style="margin: 0.75rem 0; border: none; border-top: 1px dashed #ccc;">
+
+        <!-- 회원탈퇴 -->
+        <form action="{% url 'accounts:account_settings' %}" method="POST" class="auth-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="delete">
-            <h3>회원탈퇴</h3>
-            <p class="profile-note">탈퇴하면 계정과 프로필 정보가 삭제돼요. 작성한 낙서도 함께 삭제됩니다.</p>
+            <h3 style="margin-bottom: 0.25rem; color: #d9534f; font-size: 1rem; text-align: center;">회원탈퇴</h3>
+            <p class="auth-subtitle" style="text-align: center; margin-bottom: 0.5rem; font-size: 0.75rem; color: #d9534f;">탈퇴하면 계정과 프로필 정보가 삭제돼요.</p>
             {% if delete_error %}
-                <div class="form-errors">{{ delete_error }}</div>
+                <div class="form-errors" style="font-size: 0.75rem;">{{ delete_error }}</div>
             {% endif %}
-            <div class="auth-field">
-                <label for="delete_confirm">확인을 위해 아이디를 입력하세요</label>
-                <input id="delete_confirm" name="delete_confirm" type="text" placeholder="{{ user.username }}">
+            <div class="auth-field" style="margin-bottom: 0.5rem;">
+                <label for="delete_confirm" style="margin-bottom: 0.25rem; font-size: 0.85rem;">확인을 위해 아이디를 입력하세요</label>
+                <input id="delete_confirm" name="delete_confirm" type="text" placeholder="{{ user.username }}" style="border-color: #f5c6cb; padding: 0.5rem;">
             </div>
-            <button type="submit" class="btn btn-red auth-submit">회원탈퇴</button>
+            <button type="submit" class="btn btn-red auth-submit" style="padding: 0.5rem; font-size: 0.9rem;">회원탈퇴</button>
         </form>
-    </div>
 
-    <a href="{% url 'accounts:profile' user.pk %}" class="auth-link">프로필로 돌아가기</a>
+        <a href="{% url 'accounts:profile' user.pk %}" class="auth-link" style="margin-top: 0.75rem; font-size: 0.85rem;">프로필로 돌아가기</a>
+    </div>
 </section>
 {% endblock %}

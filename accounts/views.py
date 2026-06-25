@@ -142,3 +142,12 @@ def follow(request, user_pk):
         }
         return JsonResponse(context)
     return JsonResponse({'error': 'You cannot follow yourself.'}, status=400)
+
+@require_POST
+@login_required
+def upload_profile_image(request):
+    if 'profile_image' in request.FILES:
+        request.user.profile_image = request.FILES['profile_image']
+        request.user.save(update_fields=['profile_image'])
+        return JsonResponse({'success': True, 'url': request.user.profile_image.url})
+    return JsonResponse({'success': False, 'error': 'No image provided'}, status=400)
