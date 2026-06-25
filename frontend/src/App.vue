@@ -299,8 +299,12 @@
       <div class="retro-content-inner" style="padding: 20px;">
         <h2 style="text-align: center; margin-bottom: 15px; color: var(--primary-color);">🏆 명예의 전당</h2>
         <input type="text" v-model="rankingSearchQuery" class="input-field" placeholder="게임명 검색..." style="margin-bottom: 15px; width: 100%; border: 2px solid var(--primary-color);" />
+        <div class="ranking-modal-summary">
+          <span>{{ rankingPageStart }}~{{ rankingPageEnd }}위 / 총 {{ rankingTotalCount }}개</span>
+          <span v-if="trendingLoading"><i class="fa-solid fa-spinner fa-spin"></i> 불러오는 중...</span>
+        </div>
         
-        <div style="max-height: 400px; overflow-y: auto; border: 2px solid #ccc; background: #fff;">
+        <div style="max-height: 520px; overflow-y: auto; border: 2px solid #ccc; background: #fff;">
           <table class="games-table" style="width: 100%; margin: 0; border-collapse: collapse;">
             <thead style="background: #eadecc; position: sticky; top: 0;">
               <tr>
@@ -310,9 +314,9 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="game in filteredRankings" :key="game.game_id" @click="openGameModal(game.game_id, game.title)" style="cursor: pointer; border-bottom: 1px solid #eee;">
+              <tr v-for="game in filteredRankings" :key="game.game_id" @click="openGameModal(game.game_id, displayGameTitle(game))" style="cursor: pointer; border-bottom: 1px solid #eee;">
                 <td style="padding: 10px; text-align: center; font-weight: bold;" :style="{ color: game.rank <= 3 ? 'red' : 'var(--text-light)' }">{{ game.rank }}</td>
-                <td style="padding: 10px; font-weight: bold;">{{ game.title }}</td>
+                <td style="padding: 10px; font-weight: bold;">{{ displayGameTitle(game) }}</td>
                 <td style="padding: 10px; text-align: right; color: var(--text-light); font-size: 0.85rem;"><i class="fa-regular fa-eye"></i> {{ game.view_count || 0 }}</td>
               </tr>
               <tr v-if="filteredRankings.length === 0">
@@ -320,6 +324,17 @@
               </tr>
             </tbody>
           </table>
+        </div>
+        <div class="ranking-pagination">
+          <button class="btn btn-outline" type="button" @click="changeRankingPage(-1)" :disabled="rankingPage <= 1 || trendingLoading">
+            <i class="fa-solid fa-chevron-left"></i>
+            이전 50개
+          </button>
+          <span>{{ rankingPage }} / {{ rankingTotalPages }}</span>
+          <button class="btn btn-outline" type="button" @click="changeRankingPage(1)" :disabled="rankingPage >= rankingTotalPages || trendingLoading">
+            다음 50개
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
         </div>
       </div>
     </div>
@@ -523,7 +538,7 @@
             <div class="modal-game-heading">
               <span class="modal-game-kicker">게임 상세</span>
               <h2>{{ modalFeedbackTitle }}</h2>
-              <div v-if="gameModal.details" class="modal-game-meta">
+              <div v-if="hasDetailStats(gameModal.details)" class="modal-game-meta">
                 <span><i class="fa-solid fa-users"></i> {{ gameModal.details.min_players }}~{{ gameModal.details.max_players }}명</span>
                 <span><i class="fa-regular fa-clock"></i> {{ gameModal.details.playing_time }}분</span>
                 <span><i class="fa-solid fa-signal"></i> {{ Number(gameModal.details.weight).toFixed(1) }}</span>
@@ -539,7 +554,7 @@
             <section class="detail-section rule-section">
               <h4 class="rule-summary-title">룰 요약</h4>
               <div class="rule-summary-panel">
-                <i v-if="gameModal.guideLoading" class="fa-solid fa-spinner fa-spin"></i>
+                <span v-if="gameModal.guideLoading" class="guide-loader" aria-label="룰 요약 로딩 중"></span>
                 <template v-else-if="gameModal.ruleSummary">
                   <div class="rule-theme-line">
                     {{ gameModal.ruleSummary.theme_intro }}
@@ -566,7 +581,7 @@
             <section class="detail-section video-section">
               <h4>유튜브 영상 (룰 가이드)</h4>
               <div class="youtube-box">
-                <i v-if="gameModal.guideLoading" class="fa-solid fa-spinner fa-spin"></i>
+                <span v-if="gameModal.guideLoading" class="guide-loader guide-loader-light" aria-label="영상 로딩 중"></span>
                 <iframe
                   v-else-if="gameModal.youtubeVideoId"
                   width="100%"
@@ -674,20 +689,33 @@ import TitleAnimation from './components/TitleAnimation.vue'
 
 const view = ref('main')
 const trendingGames = ref([])
+const topRankingGames = ref([])
 const trendingLoading = ref(false)
+const rankingPage = ref(1)
+const rankingPageSize = 50
+const rankingTotalCount = ref(0)
+const rankingTotalPages = ref(1)
 
 const top5Games = computed(() => {
-  return trendingGames.value.slice(0, 5).map((game, i) => ({ ...game, rank: i + 1 }))
+  return topRankingGames.value.slice(0, 5).map((game, i) => ({ ...game, rank: i + 1 }))
 })
 
 const rankingModalOpen = ref(false)
 const rankingSearchQuery = ref('')
 
 const filteredRankings = computed(() => {
-  const list = trendingGames.value.map((game, i) => ({ ...game, rank: i + 1 }))
-  if (!rankingSearchQuery.value) return list
-  return list.filter(game => game.title.toLowerCase().includes(rankingSearchQuery.value.toLowerCase()))
+  const startRank = (rankingPage.value - 1) * rankingPageSize
+  const list = trendingGames.value.map((game, i) => ({ ...game, rank: startRank + i + 1 }))
+  const query = rankingSearchQuery.value.trim().toLowerCase()
+  if (!query) return list
+  return list.filter(game => rankingSearchText(game).includes(query))
 })
+
+const rankingPageStart = computed(() => {
+  if (!rankingTotalCount.value) return 0
+  return (rankingPage.value - 1) * rankingPageSize + 1
+})
+const rankingPageEnd = computed(() => Math.min(rankingPage.value * rankingPageSize, rankingTotalCount.value))
 
 function openRankingModal() {
   rankingModalOpen.value = true
@@ -695,6 +723,12 @@ function openRankingModal() {
 }
 function closeRankingModal() {
   rankingModalOpen.value = false
+}
+
+function changeRankingPage(offset) {
+  const nextPage = Math.min(rankingTotalPages.value, Math.max(1, rankingPage.value + offset))
+  if (nextPage === rankingPage.value) return
+  fetchTrendingGames(nextPage)
 }
 
 const recommendModal = reactive({
@@ -834,6 +868,24 @@ function displayGameTitle(item) {
   return item?.display_title || item?.korean_title || item?.title || ''
 }
 
+function hasDetailStats(details) {
+  return Boolean(
+    details
+    && details.min_players != null
+    && details.max_players != null
+    && details.playing_time != null
+    && details.weight != null
+  )
+}
+
+function rankingSearchText(game) {
+  return [
+    displayGameTitle(game),
+    game?.korean_title,
+    game?.title
+  ].filter(Boolean).join(' ').toLowerCase()
+}
+
 function detailImageUrl(details) {
   return (
     details?.image_url
@@ -939,12 +991,22 @@ function backToRecommendInput() {
   recommendModal.step = 1
 }
 
-async function fetchTrendingGames() {
+async function fetchTrendingGames(page = rankingPage.value) {
   trendingLoading.value = true
   try {
-    const response = await fetch('/boardgames/api/trending/')
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(rankingPageSize)
+    })
+    const response = await fetch(`/boardgames/api/trending/?${params.toString()}`)
     const data = await response.json()
     trendingGames.value = data.games || []
+    if (Number(data.page || page) === 1) {
+      topRankingGames.value = data.games || []
+    }
+    rankingPage.value = data.page || page
+    rankingTotalCount.value = data.total_count || trendingGames.value.length
+    rankingTotalPages.value = data.total_pages || 1
   } catch (error) {
     console.error("Trending fetch error", error)
   } finally {
@@ -1027,6 +1089,31 @@ function setGuideCache(key, value) {
 
 function getCachedGuide(key) {
   return getGuideCache()[key] || null
+}
+
+function hasCachedGuideContent(cached) {
+  if (!cached) return false
+  return Boolean(normalizeRuleSummary(cached.ruleSummary) || (cached.cachedFromServer && String(cached.summary || '').trim()))
+}
+
+function applyCachedGuide(cached, options = {}) {
+  if (!cached) return false
+
+  if (options.includeDetails && cached.details) {
+    gameModal.details = cached.details
+    gameModal.imageUrl = detailImageUrl(cached.details) || gameModal.imageUrl
+    gameModal.gameId = cached.details.boardgame?.game_id || gameModal.gameId
+  }
+
+  gameModal.summary = cached.summary || gameModal.summary
+  gameModal.ruleSummary = normalizeRuleSummary(cached.ruleSummary) || gameModal.ruleSummary
+  gameModal.youtubeVideoId = cached.youtubeVideoId || gameModal.youtubeVideoId
+
+  return hasCachedGuideContent(cached)
+}
+
+function cacheGuideForKeys(keys, value) {
+  keys.filter(Boolean).forEach((key) => setGuideCache(key, value))
 }
 
 function guideTitleKey(title) {
@@ -1416,20 +1503,35 @@ async function openGameModal(gameId, title) {
 async function fetchGameSmartGuide(gameId) {
   const cacheKey = guideIdKey(gameId)
   const cached = getCachedGuide(cacheKey)
-  if (cached) {
-    gameModal.youtubeVideoId = cached.youtubeVideoId || ''
+  if (applyCachedGuide(cached)) {
+    return
   }
 
   gameModal.guideLoading = true
   try {
     const response = await fetch(`/boardgames/${gameId}/recommend/`)
+    if (!response.ok) throw new Error('Guide not found')
     const data = await response.json()
     gameModal.summary = data.summary || ''
     gameModal.ruleSummary = normalizeRuleSummary(data.rule_summary)
     gameModal.youtubeVideoId = data.youtube_videoId || ''
-    setGuideCache(cacheKey, {
-      youtubeVideoId: gameModal.youtubeVideoId
+    const guidePayload = {
+      summary: gameModal.summary,
+      ruleSummary: gameModal.ruleSummary,
+      youtubeVideoId: gameModal.youtubeVideoId,
+      cachedFromServer: true
+    }
+    cacheGuideForKeys([
+      cacheKey,
+      gameModal.details?.boardgame?.title ? guideTitleKey(gameModal.details.boardgame.title) : '',
+      gameModal.details?.boardgame?.korean_title ? guideTitleKey(gameModal.details.boardgame.korean_title) : ''
+    ], {
+      ...guidePayload,
+      details: gameModal.details
     })
+  } catch (error) {
+    gameModal.summary = '룰 요약을 불러오지 못했습니다. 잠시 후 다시 열어보세요.'
+    gameModal.ruleSummary = null
   } finally {
     gameModal.guideLoading = false
   }
@@ -1448,10 +1550,9 @@ async function openAiRecommendModal(title, options = {}) {
   try {
     const cacheKey = guideTitleKey(title)
     const cached = getCachedGuide(cacheKey)
-    if (cached) {
-      gameModal.details = cached.details || null
-      gameModal.imageUrl = detailImageUrl(gameModal.details) || gameModal.imageUrl
-      gameModal.youtubeVideoId = cached.youtubeVideoId || ''
+    if (applyCachedGuide(cached, { includeDetails: true })) {
+      updateRecentViewedGameImage(modalTitle, gameModal.imageUrl)
+      return
     }
 
     const response = await fetch(`/boardgames/api/details_by_title/?title=${encodeURIComponent(title)}`)
@@ -1465,10 +1566,18 @@ async function openAiRecommendModal(title, options = {}) {
       gameModal.gameId = gameModal.details.boardgame?.game_id || null
       updateRecentViewedGameImage(modalTitle, gameModal.imageUrl)
     }
-    setGuideCache(cacheKey, {
+    const guidePayload = {
       details: gameModal.details,
-      youtubeVideoId: gameModal.youtubeVideoId
-    })
+      summary: gameModal.summary,
+      ruleSummary: gameModal.ruleSummary,
+      youtubeVideoId: gameModal.youtubeVideoId,
+      cachedFromServer: true
+    }
+    cacheGuideForKeys([
+      cacheKey,
+      gameModal.gameId ? guideIdKey(gameModal.gameId) : '',
+      modalTitle !== title ? guideTitleKey(modalTitle) : ''
+    ], guidePayload)
   } finally {
     gameModal.loading = false
     gameModal.guideLoading = false

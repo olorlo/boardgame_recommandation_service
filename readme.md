@@ -4,6 +4,25 @@
 
 ---
 
+## 📦 3000등 데이터 갱신 흐름
+
+DB 파일을 공유하지 않고 CSV와 관리 명령어로 데이터를 재현합니다.
+
+```bash
+python manage.py import_boardgames_from_csv --path boardgames_ranks.csv --limit 3000
+python manage.py import_boardlife_titles_from_csv --path boardlife_titles_1_40.csv
+python manage.py fetch_game_details --all --rank-max 3000 --sleep 1.5
+python manage.py export_game_details --path data/game_details.csv --rank-max 3000
+```
+
+팀원이 전달받은 `data/game_details.csv`를 DB에 반영할 때는 아래 명령어를 사용합니다.
+
+```bash
+python manage.py import_game_details --path data/game_details.csv
+```
+
+---
+
 ## 🚀 오늘 구현한 핵심 기능 (12회차 관통 프로젝트)
 
 1. **기본 CRUD 및 인증 기능 보완**
