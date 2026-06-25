@@ -89,25 +89,8 @@ class Command(BaseCommand):
                     )
 
                     update_fields = []
-                    title = optional_text(row.get("title"))
-                    korean_title = optional_text(row.get("korean_title"))
-                    rank = row.get("rank")
                     thumbnail_url = optional_text(row.get("thumbnail_url"))
                     image_url = optional_text(row.get("image_url"))
-                    if title and game.title != title:
-                        game.title = title
-                        update_fields.append("title")
-                    if korean_title and game.korean_title != korean_title:
-                        game.korean_title = korean_title
-                        update_fields.append("korean_title")
-                    if rank not in [None, ""]:
-                        try:
-                            parsed_rank = required_int(rank, "rank")
-                        except ValueError:
-                            parsed_rank = None
-                        if parsed_rank and game.rank != parsed_rank:
-                            game.rank = parsed_rank
-                            update_fields.append("rank")
                     if thumbnail_url and game.thumbnail_url != thumbnail_url:
                         game.thumbnail_url = thumbnail_url
                         update_fields.append("thumbnail_url")

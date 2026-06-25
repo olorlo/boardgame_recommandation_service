@@ -15,12 +15,9 @@ ENV/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
-staticfiles/
 
 # Data Files
 *.csv
-!boardgames_ranks.csv
-!data/game_details.csv
 dummy_reviews_gen.json
 
 # User uploads

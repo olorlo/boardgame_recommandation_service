@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import environ
 import os
-import dj_database_url
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -26,33 +25,24 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 BGG_TOKEN = env("BGG_TOKEN", default=env("BGG_KEY", default=""))
 #----------------------------
 
-RAILWAY_PUBLIC_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN', '').strip()
-IS_RAILWAY = bool(os.environ.get('RAILWAY_ENVIRONMENT_NAME') or RAILWAY_PUBLIC_DOMAIN)
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('SECRET_KEY', default='django-insecure-10=)x-b(wdnn3*f!^*d1(-zz7m439**h2xysh*+my055ixe#bc')
+SECRET_KEY = 'django-insecure-10=)x-b(wdnn3*f!^*d1(-zz7m439**h2xysh*+my055ixe#bc'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env.bool('DEBUG', default=not IS_RAILWAY)
+DEBUG = True
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['127.0.0.1', 'localhost'])
-if RAILWAY_PUBLIC_DOMAIN and RAILWAY_PUBLIC_DOMAIN not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
 CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:5173',
     'http://127.0.0.1:5174',
     'http://localhost:5173',
     'http://localhost:5174',
-] + env.list('CSRF_TRUSTED_ORIGINS', default=[])
-if RAILWAY_PUBLIC_DOMAIN:
-    railway_origin = f'https://{RAILWAY_PUBLIC_DOMAIN}'
-    if railway_origin not in CSRF_TRUSTED_ORIGINS:
-        CSRF_TRUSTED_ORIGINS.append(railway_origin)
+]
 
 
 # Application definition
@@ -74,7 +64,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -107,10 +96,10 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600,
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 }
 
 
@@ -150,13 +139,9 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

@@ -25,7 +25,11 @@ def _game_display_title(boardgame):
 # --- HTML & AJAX Views ---
 
 def index(request):
-    return render(request, 'vue_index.html')
+    games = BoardGames.objects.all()[:50] # initial load limit
+    context = {
+        'games': games,
+    }
+    return render(request, 'games/index.html', context)
 
 def filter_games(request):
     players = request.GET.get('players')
@@ -470,34 +474,25 @@ def _fallback_reason(detail, difficulty):
     )
 
 
-def _bgg_xml_get(url, timeout=10):
-    headers = {
-        "User-Agent": "BoardgameRecommendationService/1.0 (student deployment; contact: noreply@example.com)",
-    }
-    response = requests.get(url, headers=headers, timeout=timeout)
-    token = getattr(settings, "BGG_TOKEN", "") or ""
-    if response.status_code in [401, 403] and token:
-        auth_headers = {
-            **headers,
-            "Authorization": f"Bearer {token}",
-        }
-        auth_response = requests.get(url, headers=auth_headers, timeout=timeout)
-        if auth_response.status_code < 400:
-            return auth_response
-    return response
-
-
 def _cache_bgg_image(boardgame):
     if boardgame.thumbnail_url or boardgame.image_url:
         return boardgame.thumbnail_url or boardgame.image_url
 
     import xml.etree.ElementTree as ET
 
+    token = getattr(settings, "BGG_TOKEN", "") or ""
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
     try:
-        response = _bgg_xml_get(
+        response = requests.get(
             f"https://boardgamegeek.com/xmlapi2/thing?id={boardgame.game_id}",
+            headers=headers,
             timeout=5,
         )
+        if response.status_code == 401 and headers:
+            response = requests.get(
+                f"https://boardgamegeek.com/xmlapi2/thing?id={boardgame.game_id}",
+                timeout=5,
+            )
         if response.status_code == 202:
             return ""
         response.raise_for_status()
@@ -571,11 +566,19 @@ def _plain_text(value):
 
 
 def _fetch_bgg_rule_context(boardgame):
+    token = getattr(settings, "BGG_TOKEN", "") or ""
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
     try:
-        response = _bgg_xml_get(
+        response = requests.get(
             f"https://boardgamegeek.com/xmlapi2/thing?id={boardgame.game_id}&stats=1",
+            headers=headers,
             timeout=10,
         )
+        if response.status_code == 401 and headers:
+            response = requests.get(
+                f"https://boardgamegeek.com/xmlapi2/thing?id={boardgame.game_id}&stats=1",
+                timeout=10,
+            )
         if response.status_code == 202:
             return {}
         response.raise_for_status()

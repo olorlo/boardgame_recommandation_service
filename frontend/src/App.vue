@@ -802,14 +802,6 @@ const recommendationSeenGameIds = ref([])
 const recentViewedGames = ref([])
 const currentRecentIndex = ref(0)
 const currentRecentGame = computed(() => recentViewedGames.value[currentRecentIndex.value] || null)
-let tickerInterval = null
-
-function startTicker() {
-  if (tickerInterval) clearInterval(tickerInterval)
-  tickerInterval = setInterval(() => {
-    nextRecentGame()
-  }, 5000)
-}
 
 function nextRecentGame() {
   if (recentViewedGames.value.length <= 1) return

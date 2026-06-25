@@ -9,7 +9,3 @@ python-dotenv==1.1.1
 google-generativeai==0.8.6
 google-api-python-client==2.193.0
 django-environ==0.13.0
-dj-database-url==3.0.1
-gunicorn==23.0.0
-psycopg[binary]==3.2.9
-whitenoise==6.9.0
