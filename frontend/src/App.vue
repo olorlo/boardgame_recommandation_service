@@ -47,28 +47,29 @@
             </button>
           </div>
           <div class="tile-content" style="padding: 0; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative;">
-            <p v-if="!recentViewedGames.length" class="recent-empty" style="font-size: 1.1rem; color: #888; text-align: center; padding: 20px;">아직 확인한 게임이 없습니다.</p>
+            <p v-if="!currentUser.isAuthenticated" class="recent-empty" style="font-size: 1.1rem; color: #888; text-align: center; padding: 20px; font-weight: bold;">로그인 후 이용할 수 있습니다.</p>
+            <p v-else-if="!recentViewedGames.length" class="recent-empty" style="font-size: 1.1rem; color: #888; text-align: center; padding: 20px;">아직 확인한 게임이 없습니다.</p>
             <div v-else class="carousel-container" style="display: flex; align-items: center; justify-content: space-between; width: 100%; height: 100%;">
               <button class="carousel-btn" @click.stop="prevRecentGame" :disabled="recentViewedGames.length <= 1" style="position: absolute; left: 8px; z-index: 10; background: rgba(255,255,255,0.85); border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; justify-content: center; align-items: center; font-size: 1.1rem; color: var(--primary-color); cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" :style="{ opacity: recentViewedGames.length <= 1 ? 0.3 : 1 }">
                 <i class="fa-solid fa-chevron-left"></i>
               </button>
               
-              <div class="carousel-item" @click="openAiRecommendModal(currentRecentGame.title, { imageUrl: currentRecentGame.imageUrl })" style="flex: 1; height: 100%; display: flex; flex-direction: column; cursor: pointer; transition: transform 0.2s; overflow: hidden; padding: 10px; box-sizing: border-box;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+              <div class="carousel-item" @click="openAiRecommendModal(currentRecentGame.title, { imageUrl: currentRecentGame.imageUrl })" style="flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; transition: transform 0.2s; overflow: hidden; padding: 10px; box-sizing: border-box;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                 
-                <div class="carousel-image-container" style="flex: 1; min-height: 0; width: 100%; background-color: #f9f5ec; border-radius: 8px; display: flex; justify-content: center; align-items: center; overflow: hidden; margin-bottom: 8px;">
+                <div class="carousel-image-container" style="height: 160px; min-height: 160px; width: 100%; background-color: #f9f5ec; border-radius: 8px; display: flex; justify-content: center; align-items: center; overflow: hidden; margin-bottom: 8px; flex-shrink: 0;">
                   <img v-if="currentRecentGame.imageUrl" :src="currentRecentGame.imageUrl" alt="게임 썸네일" style="width: 100%; height: 100%; object-fit: contain;" />
                   <i v-else class="fa-solid fa-chess-board carousel-fallback-icon" style="font-size: 3rem; color: #d0c0a0;"></i>
                 </div>
                 
-                <div style="text-align: center; padding-bottom: 2px;">
+                <div style="text-align: center; height: 50px; display: flex; flex-direction: column; justify-content: center; flex-shrink: 0;">
                   <div style="font-size: 1.1rem; font-weight: 900; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 5px;">
                     {{ currentRecentGame.title }}
                   </div>
-                  <div style="font-size: 0.85rem; font-weight: bold; color: var(--primary-color); margin-top: 4px;">
+                  <div style="font-size: 0.8rem; color: #d9534f; margin-top: 4px; font-weight: bold;">
                     자세히 보기 <i class="fa-solid fa-arrow-right"></i>
                   </div>
                 </div>
-                <div style="text-align: center; font-size: 0.7rem; color: #aaa; margin-top: 2px;">
+                <div style="text-align: center; font-size: 0.7rem; color: #aaa; margin-top: auto;">
                   {{ currentRecentIndex + 1 }} / {{ recentViewedGames.length }}
                 </div>
               </div>
@@ -117,7 +118,7 @@
         </div>
 
         <!-- 6. 순서 뽑기 -->
-        <div class="map-tile tile-tool-turn" @click="openToolModal('turn')">
+        <div class="map-tile tile-tool-turn" @click="openToolModal('turn', $event)">
           <div class="tile-content tool-content">
             <div class="tool-emoji">🪜</div>
             <h3>순서 뽑기</h3>
@@ -125,7 +126,7 @@
         </div>
 
         <!-- 7. 벌칙 뽑기 -->
-        <div class="map-tile tile-tool-penalty" @click="openToolModal('penalty')">
+        <div class="map-tile tile-tool-penalty" @click="openToolModal('penalty', $event)">
           <div class="tile-content tool-content">
             <div class="tool-emoji">💣</div>
             <h3>벌칙 뽑기</h3>
@@ -351,15 +352,6 @@
         <div class="retro-titlebar-close" @click="closeToolModal">X</div>
       </div>
       <div class="retro-content-inner">
-        <div class="tool-tabs" style="margin-bottom:20px; text-align: left; display: block; border-bottom: none;">
-          <button class="tool-tab" :style="toolModal === 'penalty' ? 'background: var(--primary-color); color: white; border: 2px inset #eadecc;' : 'background: #eadecc; color: var(--text-dark); border: 2px outset #fff;'" style="width:auto; padding:0.4rem 0.8rem; box-shadow:none; font-size:0.9rem; border-radius: 0; margin-right: 5px; cursor: pointer;" @click="openToolModal('penalty')">
-            벌칙 뽑기
-          </button>
-          <button class="tool-tab" :style="toolModal === 'turn' ? 'background: var(--primary-color); color: white; border: 2px inset #eadecc;' : 'background: #eadecc; color: var(--text-dark); border: 2px outset #fff;'" style="width:auto; padding:0.4rem 0.8rem; box-shadow:none; font-size:0.9rem; border-radius: 0; cursor: pointer;" @click="openToolModal('turn')">
-            순서 정하기
-          </button>
-        </div>
-
       <template v-if="toolModal === 'penalty'">
         <h2 class="tool-title">벌칙 원판</h2>
         <p class="tool-subtitle">벌칙과 확률을 정한 뒤 원판을 돌려보세요.</p>
@@ -408,7 +400,7 @@
             </div>
             <div v-for="(item, index) in wheelItems" :key="item.id" class="wheel-item-row">
               <span class="color-dot" :style="{ background: item.color }"></span>
-              <input v-model="item.label" class="input-field wheel-label" aria-label="벌칙 내용" />
+              <input v-model="item.label" class="input-field wheel-label" autocomplete="off" spellcheck="false" aria-label="벌칙 내용" />
               <input
                 :value="item.isAuto ? autoSafeProbability : item.probability"
                 :disabled="item.isAuto"
@@ -462,7 +454,7 @@
           <i class="fa-solid fa-shuffle"></i> 사다리 만들기
         </button>
 
-        <div v-if="ladderReady" class="ladder-wrap">
+        <div v-if="ladderReady" class="ladder-wrap anim-ladder-intro-active">
           <div class="ladder-start-row" :style="{ gridTemplateColumns: `repeat(${playerNames.length}, 1fr)` }">
             <button
               v-for="(_, index) in playerNames"
@@ -1204,7 +1196,27 @@ async function openReviewFromRecent(title, displayTitle = '') {
   await openAiRecommendModal(title, { openReview: true, displayTitle })
 }
 
-function openToolModal(type) {
+function openToolModal(type, event) {
+  if (event && event.currentTarget) {
+    const el = event.currentTarget.querySelector('.tool-emoji')
+    if (el) {
+      if (type === 'penalty') {
+        el.classList.add('anim-bomb-explode-active')
+        setTimeout(() => {
+          toolModal.value = type
+          el.classList.remove('anim-bomb-explode-active')
+        }, 600)
+        return
+      } else if (type === 'turn') {
+        el.classList.add('anim-ladder-bounce-active')
+        setTimeout(() => {
+          toolModal.value = type
+          el.classList.remove('anim-ladder-bounce-active')
+        }, 400)
+        return
+      }
+    }
+  }
   toolModal.value = type
 }
 
