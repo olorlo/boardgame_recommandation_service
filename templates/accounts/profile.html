@@ -7,9 +7,9 @@
         <div class="profile-col-1" style="display: flex; flex-direction: column; gap: 1rem; overflow-y: auto;" class="custom-scrollbar">
             <div>
                 <div class="profile-top" style="margin-bottom: 1rem; text-align: center;">
-                    <div class="profile-avatar" style="margin-bottom: 0.5rem; font-size: 2.5rem; color: var(--primary-color); display: inline-block; position: relative;">
+                    <div class="profile-avatar" style="margin-bottom: 0.5rem; color: var(--primary-color); display: inline-block; position: relative;">
                         {% if person.profile_image %}
-                            <img id="avatarPreview" src="{{ person.profile_image.url }}" alt="{{ person.username }} 프로필사진" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--accent-color);">
+                            <img id="avatarPreview" src="{{ person.profile_image.url }}" alt="{{ person.username }} 프로필사진" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--accent-color); font-size: 0.8rem;" onerror="this.onerror=null; this.outerHTML='<i class=\'fa-solid fa-circle-user\' style=\'font-size: 80px;\'></i>';">
                         {% else %}
                             <i id="avatarPreviewIcon" class="fa-solid fa-circle-user" style="font-size: 80px;"></i>
                         {% endif %}
